@@ -21,7 +21,7 @@ from .utils import get_deck_hash_from_card
 from .thread import run_function_in_thread
 
 from .gear_menu_setup import add_browser_menu_item, on_deck_browser_will_show_options_menu
-from .dialogs import AddChangelogDialog, ProtectFieldsDialog
+from .dialogs import AddChangelogDialog, ProtectFieldsDialog, UpdateReminderDialog
 from .var_defs import PREFIX_PROTECTED_FIELDS
 
 from .auth_manager import auth_manager
@@ -636,6 +636,52 @@ def patch_image_occlusion_enhanced():
     ioe_add.get_image_dimensions = hk_get_image_dimensions
     return True
     
+def _get_outdated_subscriptions() -> list:
+    """Return list of (deck_hash, deck_name) for subscriptions not updated in over a week."""
+    from datetime import datetime, timedelta, timezone
+    from .utils import DeckManager, get_local_deck_from_hash
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    outdated = []
+
+    with DeckManager() as decks:
+        for deck_hash, details in decks:
+            # Skip decks that haven't been imported yet (no deckId or deckId=0)
+            if details.get("deckId", 0) == 0:
+                continue
+
+            ts_str = details.get("timestamp")
+            if ts_str:
+                try:
+                    ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                except (ValueError, TypeError):
+                    # Unparseable timestamp → treat as outdated
+                    ts = None
+            else:
+                ts = None
+
+            if ts is None or ts < cutoff:
+                deck_name = get_local_deck_from_hash(deck_hash)
+                if deck_name and deck_name != "None":
+                    outdated.append(deck_name)
+
+    return outdated
+
+
+def _show_update_reminder_if_needed():
+    """Check for outdated subscriptions and show the update reminder dialog if any are found."""
+    if not auth_manager.is_logged_in():
+        return
+
+    outdated = _get_outdated_subscriptions()
+    if not outdated:
+        return
+
+    dialog = UpdateReminderDialog(outdated, parent=mw)
+    if dialog.exec() and dialog.should_update():
+        async_update(silent=False)
+
+
 def onProfileLoaded():
     """Called when the Anki profile finishes loading."""
     from . import main
@@ -648,6 +694,7 @@ def onProfileLoaded():
     main.media_manager.set_media_folder(mw.col.media.dir())
     
     autoUpdate()
+    _show_update_reminder_if_needed()
     refresh_notifications()
     patch_successful = patch_image_occlusion_enhanced()
     logger.info(f"Image Occlusion Enhanced patch: {patch_successful}")

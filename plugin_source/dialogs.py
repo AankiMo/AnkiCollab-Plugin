@@ -685,3 +685,90 @@ class ProtectFieldsDialog(QDialog):
     def get_selected_fields(self):
         """Returns (list of selected field names, protect_tags bool) or None if cancelled."""
         return self.result_fields
+
+
+class UpdateReminderDialog(QDialog):
+    """Dialog reminding users to update decks that haven't been updated for over a week."""
+
+    def __init__(self, outdated_decks: list, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("AnkiCollab - Update Reminder")
+        self.setModal(True)
+        self.setMinimumWidth(380)
+        self._should_update = False
+
+        colors = get_colors()
+        self.setStyleSheet(get_dialog_style())
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Header
+        header = QLabel("Subscribed Decks May Be Outdated")
+        header.setStyleSheet(
+            f"font-size: 15px; font-weight: 500; color: {colors['text_primary']};"
+        )
+        layout.addWidget(header)
+
+        # Message
+        singular = len(outdated_decks) == 1
+        plural_suffix = "" if singular else "s"
+        verb = "hasn't" if singular else "haven't"
+        msg = QLabel(
+            f"The following subscribed deck{plural_suffix} {verb} been updated "
+            f"in over a week. Consider checking for updates:"
+        )
+        msg.setWordWrap(True)
+        msg.setStyleSheet(f"color: {colors['text_secondary']}; margin-bottom: 4px;")
+        layout.addWidget(msg)
+
+        # Deck list
+        list_widget = QListWidget()
+        list_widget.setStyleSheet(f"""
+            QListWidget {{
+                border: 1px solid {colors['border']};
+                border-radius: 5px;
+                background-color: {colors['surface']};
+                color: {colors['text_primary']};
+                padding: 4px;
+            }}
+            QListWidget::item {{
+                padding: 6px 8px;
+                border-bottom: 1px solid {colors['border']};
+            }}
+            QListWidget::item:last {{
+                border-bottom: none;
+            }}
+        """)
+        for deck_name in outdated_decks:
+            list_widget.addItem(deck_name)
+        list_widget.setMaximumHeight(min(len(outdated_decks) * 36 + 8, 220))
+        layout.addWidget(list_widget)
+
+        layout.addStretch()
+
+        # Buttons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        close_button = QPushButton("Close")
+        close_button.setStyleSheet(get_button_style('neutral'))
+        close_button.clicked.connect(self.reject)
+
+        update_button = QPushButton("Update Decks")
+        update_button.setStyleSheet(get_button_style('success'))
+        update_button.clicked.connect(self._on_update)
+
+        button_layout.addWidget(close_button)
+        button_layout.addWidget(update_button)
+        layout.addLayout(button_layout)
+
+        self.adjustSize()
+
+    def _on_update(self):
+        self._should_update = True
+        self.accept()
+
+    def should_update(self) -> bool:
+        return self._should_update
