@@ -717,34 +717,27 @@ class UpdateReminderDialog(QDialog):
         verb = "hasn't" if singular else "haven't"
         msg = QLabel(
             f"The following subscribed deck{plural_suffix} {verb} been updated "
-            f"in over a week. Consider checking for updates:"
+            f"in over a week and new content is available. Consider checking for updates:"
         )
         msg.setWordWrap(True)
         msg.setStyleSheet(f"color: {colors['text_secondary']}; margin-bottom: 4px;")
         layout.addWidget(msg)
 
-        # Deck list
-        list_widget = QListWidget()
-        list_widget.setStyleSheet(f"""
-            QListWidget {{
-                border: 1px solid {colors['border']};
-                border-radius: 5px;
-                background-color: {colors['surface']};
+        # Deck list — plain text, not selectable
+        deck_names_text = "\n".join(f"•  {name}" for name in outdated_decks)
+        deck_label = QLabel(deck_names_text)
+        deck_label.setWordWrap(True)
+        deck_label.setStyleSheet(f"""
+            QLabel {{
                 color: {colors['text_primary']};
-                padding: 4px;
-            }}
-            QListWidget::item {{
-                padding: 6px 8px;
-                border-bottom: 1px solid {colors['border']};
-            }}
-            QListWidget::item:last {{
-                border-bottom: none;
+                background-color: {colors['surface']};
+                border-radius: 5px;
+                padding: 10px 12px;
+                font-size: 13px;
+                line-height: 1.5;
             }}
         """)
-        for deck_name in outdated_decks:
-            list_widget.addItem(deck_name)
-        list_widget.setMaximumHeight(min(len(outdated_decks) * 36 + 8, 220))
-        layout.addWidget(list_widget)
+        layout.addWidget(deck_label)
 
         layout.addStretch()
 

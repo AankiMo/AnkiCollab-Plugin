@@ -637,9 +637,11 @@ def patch_image_occlusion_enhanced():
     return True
     
 def _get_outdated_subscriptions() -> list:
-    """Return list of (deck_hash, deck_name) for subscriptions not updated in over a week."""
+    """Return list of deck names whose local ts is older than 7 days and whose server timestamp is newer than the local timestamp."""
+
     from datetime import datetime, timedelta, timezone
     from .utils import DeckManager, get_local_deck_from_hash
+    from .api_client import api_client
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
     outdated = []
@@ -650,17 +652,32 @@ def _get_outdated_subscriptions() -> list:
             if details.get("deckId", 0) == 0:
                 continue
 
+            local_ts = None   # Unix timestamp (float)
+            local_dt = None   # datetime object
+
             ts_str = details.get("timestamp")
             if ts_str:
                 try:
-                    ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                    local_dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                    local_ts = local_dt.timestamp()
                 except (ValueError, TypeError):
-                    # Unparseable timestamp → treat as outdated
-                    ts = None
-            else:
-                ts = None
+                    continue # Skip if timestamp is malformed
+            
+            # If local timestamp is fresh (< 7 days old), skip server check entirely
+            if local_dt is not None and local_dt >= cutoff:
+                continue
 
-            if ts is None or ts < cutoff:
+            # Local timestamp is outdated or missing → check server
+            try:
+                resp = api_client.get(f"/GetDeckTimestamp/{deck_hash}", timeout=15)
+                resp.raise_for_status()
+                server_ts = float(resp.text)
+            except Exception:
+                # Network error or server issue, skip to avoid false positives
+                continue
+
+
+            if local_ts is None or server_ts > local_ts:
                 deck_name = get_local_deck_from_hash(deck_hash)
                 if deck_name and deck_name != "None":
                     outdated.append(deck_name)
