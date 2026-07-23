@@ -637,13 +637,13 @@ def patch_image_occlusion_enhanced():
     return True
     
 def _get_outdated_subscriptions() -> list:
-    """Return list of deck names whose local ts is older than 7 days and whose server timestamp is newer than the local timestamp."""
+    """Return list of deck names whose local ts is older than 14 days and whose server timestamp is newer than the local timestamp."""
 
     from datetime import datetime, timedelta, timezone
     from .utils import DeckManager, get_local_deck_from_hash
     from .api_client import api_client
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
     outdated = []
 
     with DeckManager() as decks:
@@ -663,7 +663,7 @@ def _get_outdated_subscriptions() -> list:
                 except (ValueError, TypeError):
                     continue # Skip if timestamp is malformed
             
-            # If local timestamp is fresh (< 7 days old), skip server check entirely
+            # If local timestamp is fresh (< 14 days old), skip server check entirely
             if local_dt is not None and local_dt >= cutoff:
                 continue
 
@@ -688,6 +688,12 @@ def _get_outdated_subscriptions() -> list:
 def _show_update_reminder_if_needed():
     """Check for outdated subscriptions and show the update reminder dialog if any are found."""
     if not auth_manager.is_logged_in():
+        return
+
+    # Respect the opt-out setting (default: enabled)
+    config = mw.addonManager.getConfig(__name__) or {}
+    settings = config.get("settings", {}) if config else {}
+    if not settings.get("show_biweekly_update_reminder", True):
         return
 
     outdated = _get_outdated_subscriptions()

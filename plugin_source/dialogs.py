@@ -688,7 +688,7 @@ class ProtectFieldsDialog(QDialog):
 
 
 class UpdateReminderDialog(QDialog):
-    """Dialog reminding users to update decks that haven't been updated for over a week."""
+    """Dialog reminding users to update decks that haven't been updated for over two weeks."""
 
     def __init__(self, outdated_decks: list, parent=None):
         super().__init__(parent)
@@ -717,7 +717,7 @@ class UpdateReminderDialog(QDialog):
         verb = "hasn't" if singular else "haven't"
         msg = QLabel(
             f"The following subscribed deck{plural_suffix} {verb} been updated "
-            f"in over a week and new content is available. Consider checking for updates:"
+            f"in over two weeks and new content is available. Consider checking for updates:"
         )
         msg.setWordWrap(True)
         msg.setStyleSheet(f"color: {colors['text_secondary']}; margin-bottom: 4px;")
