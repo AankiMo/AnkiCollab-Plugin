@@ -892,6 +892,11 @@ def show_global_settings_dialog(parent_dialog):
     pull_on_startup_cb.setStyleSheet(checkbox_style)
     pull_on_startup_cb.setChecked(bool(settings.get("pull_on_startup", False)))
     pull_on_startup_cb.setToolTip("Automatically fetch updates when Anki opens (may slow startup)")
+        
+    biweekly_reminder_cb = QCheckBox("Show biweekly update reminder")
+    biweekly_reminder_cb.setStyleSheet(checkbox_style)
+    biweekly_reminder_cb.setChecked(bool(settings.get("show_biweekly_update_reminder", True)))
+    biweekly_reminder_cb.setToolTip("Reminds you on startup when subscribed decks haven't been updated in over two weeks and updates are available")
     
     suspend_new_cards_cb = QCheckBox("Automatically suspend new Cards")
     suspend_new_cards_cb.setStyleSheet(checkbox_style)
@@ -912,11 +917,6 @@ def show_global_settings_dialog(parent_dialog):
     auto_approve_cb.setStyleSheet(checkbox_style)
     auto_approve_cb.setChecked(bool(auth_manager.get_auto_approve()))
     auto_approve_cb.setToolTip("Automatically approve outgoing changes for your decks. Only works if you are a maintainer.")
-    
-    biweekly_reminder_cb = QCheckBox("Show biweekly update reminder")
-    biweekly_reminder_cb.setStyleSheet(checkbox_style)
-    biweekly_reminder_cb.setChecked(bool(settings.get("show_biweekly_update_reminder", True)))
-    biweekly_reminder_cb.setToolTip("Reminds you on startup when subscribed decks haven't been updated in over two weeks and updates are available")
 
     error_reporting_cb = QCheckBox("Send anonymous error reports (recommended)")
     error_reporting_cb.setStyleSheet(checkbox_style)
@@ -924,11 +924,11 @@ def show_global_settings_dialog(parent_dialog):
     error_reporting_cb.setToolTip("Help us fix bugs faster - no personal data is collected")
     
     global_layout.addWidget(pull_on_startup_cb)
+    global_layout.addWidget(biweekly_reminder_cb)
     global_layout.addWidget(suspend_new_cards_cb)
     global_layout.addWidget(move_cards_cb)
     global_layout.addWidget(keep_empty_subdecks_cb)
     global_layout.addWidget(auto_approve_cb)
-    global_layout.addWidget(biweekly_reminder_cb)
     global_layout.addWidget(error_reporting_cb)
     layout.addWidget(global_group)
 
@@ -1005,10 +1005,10 @@ def show_global_settings_dialog(parent_dialog):
     def save_global_settings():
         settings["preserve_deck_structure"] = True
         settings["pull_on_startup"] = pull_on_startup_cb.isChecked()
+        settings["show_biweekly_update_reminder"] = biweekly_reminder_cb.isChecked()
         settings["suspend_new_cards"] = suspend_new_cards_cb.isChecked()
         settings["auto_move_cards"] = move_cards_cb.isChecked()
         settings["keep_empty_subdecks"] = keep_empty_subdecks_cb.isChecked()
-        settings["show_biweekly_update_reminder"] = biweekly_reminder_cb.isChecked()
         settings["error_reporting_enabled"] = error_reporting_cb.isChecked()
         mw.addonManager.writeConfig(__name__, strings_data)
         auth_manager.set_auto_approve(auto_approve_cb.isChecked())
@@ -1091,6 +1091,7 @@ def store_default_config():
 
     defaults = {
         "pull_on_startup": False,
+        "show_biweekly_update_reminder": True,
         "suspend_new_cards": False,
         "auto_move_cards": False, # Note: Action text is "Do not move", so False means "Do move"
         "keep_empty_subdecks": False,
