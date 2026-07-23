@@ -284,9 +284,15 @@ def context_menu_bulk_suggest(browser: Browser, context_menu: QMenu) -> None:
     selected_nids = browser.selected_notes()
     if not selected_nids: return # Don't add if no notes selected
 
+    # Build bulk-suggest label with shortcut hint if configured
+    bulk_label = "AnkiCollab: Bulk suggest notes"
+    bulk_shortcut = _get_shortcut(SHORTCUT_BULK_SUGGEST)
+    if bulk_shortcut:
+        bulk_label += "\t" + bulk_shortcut
+
     context_menu.addSeparator()
     context_menu.addAction(
-        "AnkiCollab: Bulk suggest notes\tCtrl+Alt+B",
+        bulk_label,
         lambda: bulk_suggest_handler(browser, nids=selected_nids),
     )
     context_menu.addAction(
@@ -325,9 +331,17 @@ def context_menu_bulk_suggest(browser: Browser, context_menu: QMenu) -> None:
         pass
 
 def add_browser_bulk_suggest_action(browser: Browser) -> None:
-    action = QAction("AnkiCollab: Bulk suggest notes", browser)
-    action.setShortcut(QKeySequence("Ctrl+Alt+B"))
-    action.setShortcutContext(Qt.WidgetWithChildrenShortcut)
+    shortcut_str = _get_shortcut(SHORTCUT_BULK_SUGGEST)
+    label = "AnkiCollab: Bulk suggest notes"
+    if shortcut_str:
+        label += "\t" + shortcut_str
+
+    action = QAction(label, browser)
+    if shortcut_str:
+        seq = QKeySequence.fromString(shortcut_str)
+        if not seq.isEmpty():
+            action.setShortcut(seq)
+            action.setShortcutContext(Qt.WidgetWithChildrenShortcut)
     action.triggered.connect(lambda: trigger_bulk_suggest_from_browser(browser))
     browser.form.menu_Notes.addAction(action)
 
@@ -685,12 +699,40 @@ def update_hooks_for_login_state(logged_in: bool):
     #placeholder for future use
     pass
 
+# ── Keyboard Shortcuts ────────────────────────────────────────────────
+
+SHORTCUT_UPDATE_DECKS = "update_decks"
+SHORTCUT_BULK_SUGGEST = "bulk_suggest"
+
+
+def _get_shortcut(key: str) -> str:
+    """Return the configured shortcut string, or empty if not set."""
+    config = mw.addonManager.getConfig(__name__) or {}
+    settings = config.get("settings", {}) if config else {}
+    return settings.get(f"shortcut_{key}", "")
+
+
+def _register_update_decks_shortcut() -> None:
+    """Register the Update Decks shortcut on the main window."""
+    shortcut_str = _get_shortcut(SHORTCUT_UPDATE_DECKS)
+    if not shortcut_str:
+        return
+    seq = QKeySequence.fromString(shortcut_str)
+    if seq.isEmpty():
+        return
+    action = QAction("AnkiCollab: Update Decks", mw)
+    action.setShortcut(seq)
+    action.setShortcutContext(Qt.WindowShortcut)
+    action.triggered.connect(lambda: async_update(silent=False))
+
+
 # --- Hook Registration ---
 def hooks_init():
     """Registers all hooks. Internal checks within callbacks manage behavior."""
     gui_hooks.profile_did_open.append(onProfileLoaded)
     gui_hooks.profile_will_close.append(onProfileWillClose)
     register_sync_refresh_hook()
+    _register_update_decks_shortcut()
 
     # Add Cards related
     gui_hooks.add_cards_did_init.append(init_add_card)

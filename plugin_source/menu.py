@@ -926,6 +926,59 @@ def show_global_settings_dialog(parent_dialog):
     global_layout.addWidget(error_reporting_cb)
     layout.addWidget(global_group)
 
+    # Keyboard Shortcuts section
+    shortcuts_group = QGroupBox("Keyboard Shortcuts")
+    shortcuts_group.setStyleSheet(get_groupbox_style())
+    shortcuts_layout = QVBoxLayout(shortcuts_group)
+    shortcuts_layout.setSpacing(8)
+
+    shortcut_label_style = f"color: {colors['text_primary']}; font-size: 13px;"
+    shortcut_hint_style = f"color: {colors['text_muted']}; font-size: 11px;"
+
+    # Update Decks shortcut
+    update_row = QHBoxLayout()
+    update_label = QLabel("Update Decks:")
+    update_label.setStyleSheet(shortcut_label_style)
+    update_label.setFixedWidth(120)
+    update_shortcut_edit = QKeySequenceEdit()
+    update_shortcut_edit.setStyleSheet(get_input_style())
+    update_shortcut_edit.setMaximumWidth(180)
+    existing_update = settings.get("shortcut_update_decks", "")
+    if existing_update:
+        update_shortcut_edit.setKeySequence(QKeySequence.fromString(existing_update))
+    update_row.addWidget(update_label)
+    update_row.addWidget(update_shortcut_edit)
+    update_row.addStretch()
+    shortcuts_layout.addLayout(update_row)
+
+    update_hint = QLabel("Must contain at least two modifier keys (e.g. Ctrl+Alt+U). Works only in the main Anki window (deck overview).")
+    update_hint.setStyleSheet(shortcut_hint_style)
+    update_hint.setContentsMargins(124, 0, 0, 0)
+    shortcuts_layout.addWidget(update_hint)
+
+    # Bulk Suggest shortcut
+    bulk_row = QHBoxLayout()
+    bulk_label = QLabel("Bulk Suggest:")
+    bulk_label.setStyleSheet(shortcut_label_style)
+    bulk_label.setFixedWidth(120)
+    bulk_shortcut_edit = QKeySequenceEdit()
+    bulk_shortcut_edit.setStyleSheet(get_input_style())
+    bulk_shortcut_edit.setMaximumWidth(180)
+    existing_bulk = settings.get("shortcut_bulk_suggest", "")
+    if existing_bulk:
+        bulk_shortcut_edit.setKeySequence(QKeySequence.fromString(existing_bulk))
+    bulk_row.addWidget(bulk_label)
+    bulk_row.addWidget(bulk_shortcut_edit)
+    bulk_row.addStretch()
+    shortcuts_layout.addLayout(bulk_row)
+
+    bulk_hint = QLabel("Must contain at least two modifier keys (e.g. Ctrl+Alt+B). Works only in the Browser window.")
+    bulk_hint.setStyleSheet(shortcut_hint_style)
+    bulk_hint.setContentsMargins(124, 0, 0, 0)
+    shortcuts_layout.addWidget(bulk_hint)
+
+    layout.addWidget(shortcuts_group)
+
     # Subscription Info section 
     setting_info_label = QLabel("These settings apply globally to all your subscriptions. Changes take effect on the next import.")
     setting_info_label.setWordWrap(True)
@@ -996,13 +1049,35 @@ def show_global_settings_dialog(parent_dialog):
     save_button = QPushButton('Save Settings')
     save_button.setStyleSheet(get_button_style('success'))
 
+    def _validate_shortcut(seq: QKeySequence) -> bool:
+        """Shortcut must be empty or have at least two modifier keys."""
+        if seq.isEmpty():
+            return True
+        text = seq.toString()
+        modifiers = {"Ctrl", "Alt", "Shift", "Meta"}
+        parts = text.split("+")
+        mod_count = sum(1 for p in parts if p in modifiers)
+        return mod_count >= 2
+
     def save_global_settings():
+        # Validate shortcuts before saving
+        update_seq = update_shortcut_edit.keySequence()
+        bulk_seq = bulk_shortcut_edit.keySequence()
+        if not _validate_shortcut(update_seq):
+            showInfo("Update Decks shortcut must use at least two modifier keys (e.g. Ctrl+Alt+U).", parent=dialog)
+            return
+        if not _validate_shortcut(bulk_seq):
+            showInfo("Bulk Suggest shortcut must use at least two modifier keys (e.g. Ctrl+Alt+B).", parent=dialog)
+            return
+
         settings["preserve_deck_structure"] = True
         settings["pull_on_startup"] = pull_on_startup_cb.isChecked()
         settings["suspend_new_cards"] = suspend_new_cards_cb.isChecked()
         settings["auto_move_cards"] = move_cards_cb.isChecked()
         settings["keep_empty_subdecks"] = keep_empty_subdecks_cb.isChecked()
         settings["error_reporting_enabled"] = error_reporting_cb.isChecked()
+        settings["shortcut_update_decks"] = update_seq.toString() if not update_seq.isEmpty() else ""
+        settings["shortcut_bulk_suggest"] = bulk_seq.toString() if not bulk_seq.isEmpty() else ""
         mw.addonManager.writeConfig(__name__, strings_data)
         auth_manager.set_auto_approve(auto_approve_cb.isChecked())
         # Apply telemetry setting immediately
@@ -1010,7 +1085,7 @@ def show_global_settings_dialog(parent_dialog):
             init_sentry()
         except Exception:
             pass
-        showInfo("Settings saved! Changes will apply on the next sync.")
+        showInfo("Settings saved! Changes will apply on the next sync, restart Anki for new shortcuts to take effect.", parent=dialog)
         dialog.accept()
 
     save_button.clicked.connect(save_global_settings)
