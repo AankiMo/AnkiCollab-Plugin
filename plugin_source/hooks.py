@@ -714,8 +714,7 @@ def _get_shortcut(key: str) -> str:
 
 
 def _shortcut_display(key: str) -> str:
-    """Return the shortcut in native macOS display format (e.g. ⌃⌥B), or empty."""
-    raw = _get_shortcut(key)
+    """Return the shortcut in the native platform display format (e.g. ⌃⌥B on macOS), or empty."""
     if not raw:
         return ""
     seq = QKeySequence.fromString(raw)
@@ -736,7 +735,7 @@ def _register_update_decks_shortcut() -> None:
     action.setShortcut(seq)
     action.setShortcutContext(Qt.WindowShortcut)
     action.triggered.connect(lambda: async_update(silent=False))
-
+    mw.addAction(action)
 
 # --- Hook Registration ---
 def hooks_init():
