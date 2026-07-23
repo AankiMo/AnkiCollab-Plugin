@@ -286,7 +286,7 @@ def context_menu_bulk_suggest(browser: Browser, context_menu: QMenu) -> None:
 
     # Build bulk-suggest label with shortcut hint if configured
     bulk_label = "AnkiCollab: Bulk suggest notes"
-    bulk_shortcut = _get_shortcut(SHORTCUT_BULK_SUGGEST)
+    bulk_shortcut = _shortcut_display(SHORTCUT_BULK_SUGGEST)
     if bulk_shortcut:
         bulk_label += "\t" + bulk_shortcut
 
@@ -332,9 +332,10 @@ def context_menu_bulk_suggest(browser: Browser, context_menu: QMenu) -> None:
 
 def add_browser_bulk_suggest_action(browser: Browser) -> None:
     shortcut_str = _get_shortcut(SHORTCUT_BULK_SUGGEST)
+    shortcut_display = _shortcut_display(SHORTCUT_BULK_SUGGEST)
     label = "AnkiCollab: Bulk suggest notes"
-    if shortcut_str:
-        label += "\t" + shortcut_str
+    if shortcut_display:
+        label += "\t" + shortcut_display
 
     action = QAction(label, browser)
     if shortcut_str:
@@ -710,6 +711,17 @@ def _get_shortcut(key: str) -> str:
     config = mw.addonManager.getConfig(__name__) or {}
     settings = config.get("settings", {}) if config else {}
     return settings.get(f"shortcut_{key}", "")
+
+
+def _shortcut_display(key: str) -> str:
+    """Return the shortcut in native macOS display format (e.g. ⌃⌥B), or empty."""
+    raw = _get_shortcut(key)
+    if not raw:
+        return ""
+    seq = QKeySequence.fromString(raw)
+    if seq.isEmpty():
+        return ""
+    return seq.toString(QKeySequence.NativeText)
 
 
 def _register_update_decks_shortcut() -> None:

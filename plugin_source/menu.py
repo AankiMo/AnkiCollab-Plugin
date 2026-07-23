@@ -856,7 +856,7 @@ def show_global_settings_dialog(parent_dialog):
     
     dialog = QDialog(parent_dialog)
     dialog.setWindowTitle('Global Settings')
-    dialog.setMinimumSize(420, 420)
+    dialog.setMinimumSize(610, 560)
     dialog.setStyleSheet(get_dialog_style())
     
     layout = QVBoxLayout()
@@ -867,6 +867,18 @@ def show_global_settings_dialog(parent_dialog):
     header_label.setStyleSheet(f"font-size: 16px; font-weight: 500; margin: 10px 0; color: {colors['text_primary']};")
     header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(header_label)
+
+    # Subscription Info section
+    setting_info_label = QLabel("These settings apply globally to all your subscriptions. Changes take effect on the next import.")
+    setting_info_label.setWordWrap(True)
+    setting_info_label.setStyleSheet(f"""
+        background-color: {colors['info_bg']};
+        border: 1px solid {colors['info_border']};
+        border-radius: 4px;
+        padding: 6px;
+        color: {colors['info_text']};
+    """)
+    layout.addWidget(setting_info_label)
 
     # Get current settings
     strings_data = mw.addonManager.getConfig(__name__)
@@ -884,6 +896,7 @@ def show_global_settings_dialog(parent_dialog):
     # Subscription setting checkboxes
     global_group = QGroupBox("Subscription Settings")
     global_group.setStyleSheet(get_groupbox_style())
+    global_group.setMinimumHeight(200)
     global_layout = QVBoxLayout(global_group)
     
     checkbox_style = f"color: {colors['text_primary']};"
@@ -929,64 +942,98 @@ def show_global_settings_dialog(parent_dialog):
     # Keyboard Shortcuts section
     shortcuts_group = QGroupBox("Keyboard Shortcuts")
     shortcuts_group.setStyleSheet(get_groupbox_style())
-    shortcuts_layout = QVBoxLayout(shortcuts_group)
-    shortcuts_layout.setSpacing(8)
+    shortcuts_group.setMinimumHeight(100)
+    shortcuts_layout = QHBoxLayout(shortcuts_group)
+    shortcuts_layout.setSpacing(16)
 
-    shortcut_label_style = f"color: {colors['text_primary']}; font-size: 13px;"
-    shortcut_hint_style = f"color: {colors['text_muted']}; font-size: 11px;"
+    shortcut_label_style = f"color: {colors['text_primary']}; font-size: 12px; margin-bottom: 2px;"
 
-    # Update Decks shortcut
-    update_row = QHBoxLayout()
-    update_label = QLabel("Update Decks:")
-    update_label.setStyleSheet(shortcut_label_style)
-    update_label.setFixedWidth(120)
-    update_shortcut_edit = QKeySequenceEdit()
-    update_shortcut_edit.setStyleSheet(get_input_style())
-    update_shortcut_edit.setMaximumWidth(180)
-    existing_update = settings.get("shortcut_update_decks", "")
-    if existing_update:
-        update_shortcut_edit.setKeySequence(QKeySequence.fromString(existing_update))
-    update_row.addWidget(update_label)
-    update_row.addWidget(update_shortcut_edit)
-    update_row.addStretch()
-    shortcuts_layout.addLayout(update_row)
+    def _make_hint_icon(tooltip_text: str) -> QLabel:
+        icon = QLabel("?")
+        icon.setToolTip(tooltip_text)
+        icon.setFixedSize(14, 14)
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon.setStyleSheet(f"""
+            QLabel {{
+                color: {colors['text_muted']};
+                background-color: transparent;
+                border: 1px solid {colors['text_muted']};
+                border-radius: 7px;
+                font-size: 8px;
+                font-weight: bold;
+            }}
+        """)
+        icon.setCursor(Qt.CursorShape.PointingHandCursor)
+        return icon
 
-    update_hint = QLabel("Must contain at least two modifier keys (e.g. Ctrl+Alt+U). Works only in the main Anki window (deck overview).")
-    update_hint.setStyleSheet(shortcut_hint_style)
-    update_hint.setContentsMargins(124, 0, 0, 0)
-    shortcuts_layout.addWidget(update_hint)
+    def _make_shortcut_block(label_text, settings_key, hint_text):
+        block = QWidget()
+        block_layout = QVBoxLayout(block)
+        block_layout.setContentsMargins(0, 0, 0, 0)
+        block_layout.setSpacing(2)
 
-    # Bulk Suggest shortcut
-    bulk_row = QHBoxLayout()
-    bulk_label = QLabel("Bulk Suggest:")
-    bulk_label.setStyleSheet(shortcut_label_style)
-    bulk_label.setFixedWidth(120)
-    bulk_shortcut_edit = QKeySequenceEdit()
-    bulk_shortcut_edit.setStyleSheet(get_input_style())
-    bulk_shortcut_edit.setMaximumWidth(180)
-    existing_bulk = settings.get("shortcut_bulk_suggest", "")
-    if existing_bulk:
-        bulk_shortcut_edit.setKeySequence(QKeySequence.fromString(existing_bulk))
-    bulk_row.addWidget(bulk_label)
-    bulk_row.addWidget(bulk_shortcut_edit)
-    bulk_row.addStretch()
-    shortcuts_layout.addLayout(bulk_row)
+        label = QLabel(label_text)
+        label.setStyleSheet(shortcut_label_style)
+        block_layout.addWidget(label)
 
-    bulk_hint = QLabel("Must contain at least two modifier keys (e.g. Ctrl+Alt+B). Works only in the Browser window.")
-    bulk_hint.setStyleSheet(shortcut_hint_style)
-    bulk_hint.setContentsMargins(124, 0, 0, 0)
-    shortcuts_layout.addWidget(bulk_hint)
+        row = QHBoxLayout()
+        row.setSpacing(4)
+        edit = QKeySequenceEdit()
+        edit.setStyleSheet(get_input_style())
+        edit.setMaximumWidth(120)
+        existing = settings.get(settings_key, "")
+        if existing:
+            edit.setKeySequence(QKeySequence.fromString(existing))
+
+        clear_btn = QPushButton("Clear")
+        clear_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {colors['text_secondary']};
+                border: 1px solid {colors['border']};
+                padding: 2px 10px;
+                border-radius: 3px;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                background-color: {colors['surface_hover']};
+                color: {colors['text_primary']};
+            }}
+        """)
+        clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        clear_btn.clicked.connect(edit.clear)
+
+        hint_icon = _make_hint_icon(hint_text)
+
+        row.addWidget(edit)
+        row.addWidget(clear_btn)
+        row.addWidget(hint_icon)
+        block_layout.addLayout(row)
+
+        return block, edit
+
+    update_block, update_shortcut_edit = _make_shortcut_block(
+        "Update Decks:",
+        "shortcut_update_decks",
+        "Must contain at least two modifier keys (e.g. ⌃⌥U). "
+        "Works only in the main Anki window (deck overview).",
+    )
+    shortcuts_layout.addWidget(update_block)
+
+    bulk_block, bulk_shortcut_edit = _make_shortcut_block(
+        "Bulk Suggest:",
+        "shortcut_bulk_suggest",
+        "Must contain at least two modifier keys (e.g. ⌃⌥B). "
+        "Works only in the Browser window.",
+    )
+    shortcuts_layout.addStretch()
+    shortcuts_layout.addWidget(bulk_block)
 
     layout.addWidget(shortcuts_group)
 
-    # Subscription Info section 
-    setting_info_label = QLabel("These settings apply globally to all your subscriptions. Changes take effect on the next import.")
-    setting_info_label.setWordWrap(True)
-    setting_info_label.setStyleSheet(get_info_box_style())
-    layout.addWidget(setting_info_label)
-
     # Media and Statistics container
     media_stats_container = QWidget()
+    media_stats_container.setMinimumHeight(110)
     media_stats_layout = QHBoxLayout(media_stats_container)
     media_stats_layout.setContentsMargins(0, 0, 0, 0)
     media_stats_layout.setSpacing(6)
@@ -1085,7 +1132,7 @@ def show_global_settings_dialog(parent_dialog):
             init_sentry()
         except Exception:
             pass
-        showInfo("Settings saved! Changes will apply on the next sync, restart Anki for new shortcuts to take effect.", parent=dialog)
+        showInfo("Settings saved! Changes will apply on the next sync.", parent=dialog)
         dialog.accept()
 
     save_button.clicked.connect(save_global_settings)
@@ -1204,10 +1251,31 @@ def update_ui_for_login_state():
     if logged_in:
         refresh_notifications()
 
+def _apply_shortcut_hint():
+    """Append the configured shortcut in native format to the Update Decks action text."""
+    config = mw.addonManager.getConfig(__name__) or {}
+    settings = config.get("settings", {}) if config else {}
+    raw = settings.get("shortcut_update_decks", "")
+    if not raw:
+        return
+    seq = QKeySequence.fromString(raw)
+    if seq.isEmpty():
+        return
+    display = seq.toString(QKeySequence.NativeText)
+    if not display:
+        return
+    # Strip any existing shortcut hint before appending
+    label = pull_changes_action.text().split("\t")[0]
+    pull_changes_action.setText(f"{label}\t{display}")
+
+
 def menu_init():
     store_default_config()
 
     mw.form.menubar.addMenu(collab_menu)
+
+    # Show the configured shortcut hint in the menu item label
+    _apply_shortcut_hint()
 
     collab_menu.addAction(pull_changes_action)
     collab_menu.addSeparator()
