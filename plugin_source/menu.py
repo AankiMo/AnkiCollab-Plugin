@@ -1100,7 +1100,7 @@ def show_global_settings_dialog(parent_dialog):
         """Shortcut must be empty or have at least two modifier keys."""
         if seq.isEmpty():
             return True
-        text = seq.toString(QKeySequence.PortableText)
+        text = seq.toString(QKeySequence.SequenceFormat.PortableText)
         # If multiple key combinations are present ("Ctrl+Alt+U, Ctrl+Alt+I"), validate the first one.
         first = text.split(",", 1)[0].strip()
         modifiers = {"Ctrl", "Alt", "Shift", "Meta"}
@@ -1263,7 +1263,7 @@ def _apply_shortcut_hint():
     seq = QKeySequence.fromString(raw)
     if seq.isEmpty():
         return
-    display = seq.toString(QKeySequence.NativeText)
+    display = seq.toString(QKeySequence.SequenceFormat.NativeText)
     if not display:
         return
     # Strip any existing shortcut hint before appending
