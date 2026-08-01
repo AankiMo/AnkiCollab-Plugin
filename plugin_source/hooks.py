@@ -342,7 +342,6 @@ def add_browser_bulk_suggest_action(browser: Browser) -> None:
         seq = QKeySequence.fromString(shortcut_str)
         if not seq.isEmpty():
             action.setShortcut(seq)
-            action.setShortcutContext(Qt.WidgetWithChildrenShortcut)
             action.setShortcutContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
     action.triggered.connect(lambda: trigger_bulk_suggest_from_browser(browser))
     browser.form.menu_Notes.addAction(action)
