@@ -342,7 +342,7 @@ def add_browser_bulk_suggest_action(browser: Browser) -> None:
         seq = QKeySequence.fromString(shortcut_str)
         if not seq.isEmpty():
             action.setShortcut(seq)
-            action.setShortcutContext(Qt.WidgetWithChildrenShortcut)
+            action.setShortcutContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
     action.triggered.connect(lambda: trigger_bulk_suggest_from_browser(browser))
     browser.form.menu_Notes.addAction(action)
 
@@ -714,17 +714,16 @@ def _get_shortcut(key: str) -> str:
 
 
 def _shortcut_display(key: str) -> str:
-    """Return the shortcut in native macOS display format (e.g. ⌃⌥B), or empty."""
+    """Return the shortcut in the native platform display format (e.g. ⌃⌥B on macOS), or empty."""
     raw = _get_shortcut(key)
     if not raw:
         return ""
     seq = QKeySequence.fromString(raw)
     if seq.isEmpty():
         return ""
-    return seq.toString(QKeySequence.NativeText)
-
-
-def _register_update_decks_shortcut() -> None:
+    return seq.toString(QKeySequence.SequenceFormat.NativeText)
+ 
+def register_update_decks_shortcut() -> None:
     """Register the Update Decks shortcut on the main window."""
     shortcut_str = _get_shortcut(SHORTCUT_UPDATE_DECKS)
     if not shortcut_str:
@@ -734,7 +733,7 @@ def _register_update_decks_shortcut() -> None:
         return
     action = QAction("AnkiCollab: Update Decks", mw)
     action.setShortcut(seq)
-    action.setShortcutContext(Qt.WindowShortcut)
+    action.setShortcutContext(Qt.ShortcutContext.WindowShortcut)
     action.triggered.connect(lambda: async_update(silent=False))
     mw.addAction(action)
 
@@ -744,7 +743,7 @@ def hooks_init():
     gui_hooks.profile_did_open.append(onProfileLoaded)
     gui_hooks.profile_will_close.append(onProfileWillClose)
     register_sync_refresh_hook()
-    _register_update_decks_shortcut()
+    register_update_decks_shortcut()
 
     # Add Cards related
     gui_hooks.add_cards_did_init.append(init_add_card)
