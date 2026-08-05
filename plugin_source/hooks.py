@@ -4,7 +4,7 @@ from aqt.browser import Browser, SidebarTreeView, SidebarItem, SidebarItemType
 from anki.decks import DeckId
 from anki.notes import NoteId
 from aqt.qt import *
-from aqt.qt import QMenu, QModelIndex, QCheckBox, QDialogButtonBox, QApplication, QInputDialog
+from aqt.qt import QMenu, QModelIndex, QCheckBox, QDialogButtonBox, QApplication, QInputDialog, QAction, QKeySequence
 from anki import hooks
 from anki.collection import Collection
 from aqt.utils import askUser, showInfo
@@ -736,7 +736,7 @@ def _register_update_decks_shortcut() -> None:
     action.setShortcut(seq)
     action.setShortcutContext(Qt.WindowShortcut)
     action.triggered.connect(lambda: async_update(silent=False))
-
+    mw.addAction(action)
 
 # --- Hook Registration ---
 def hooks_init():
