@@ -44,6 +44,11 @@ from .notifications_center import (
     set_notification_visibility,
 )
 from .sentry_integration import init_sentry
+from .shortcut_validator import (
+    Context,
+    Severity,
+    validate_shortcut,
+)
 from .ui.colors import get_colors, get_button_style, get_dialog_style, get_input_style, get_table_style, get_groupbox_style, get_combobox_style, get_info_box_style
 from anki.utils import point_version
 
@@ -1096,28 +1101,28 @@ def show_global_settings_dialog(parent_dialog):
     save_button = QPushButton('Save Settings')
     save_button.setStyleSheet(get_button_style('success'))
 
-    def _validate_shortcut(seq: QKeySequence) -> bool:
-        """Shortcut must be empty or have at least two modifier keys."""
-        if seq.isEmpty():
-            return True
-        text = seq.toString(QKeySequence.SequenceFormat.PortableText)
-        # If multiple key combinations are present ("Ctrl+Alt+U, Ctrl+Alt+I"), validate the first one.
-        first = text.split(",", 1)[0].strip()
-        modifiers = {"Ctrl", "Alt", "Shift", "Meta"}
-        parts = [p.strip() for p in first.split("+") if p.strip()]
-        mod_count = sum(1 for p in parts if p in modifiers)
-        return mod_count >= 2
-
     def save_global_settings():
         # Validate shortcuts before saving
         update_seq = update_shortcut_edit.keySequence()
         bulk_seq = bulk_shortcut_edit.keySequence()
-        if not _validate_shortcut(update_seq):
-            showInfo("Update Decks shortcut must use at least two modifier keys (e.g. Ctrl+Alt+U).", parent=dialog)
+
+        # ── Update Decks (main window context) ──
+        result = validate_shortcut(update_seq, Context.MAIN_WINDOW)
+        if not result.is_valid:
+            showInfo(result.message, parent=dialog)
             return
-        if not _validate_shortcut(bulk_seq):
-            showInfo("Bulk Suggest shortcut must use at least two modifier keys (e.g. Ctrl+Alt+B).", parent=dialog)
+        if result.severity == Severity.WARNING:
+            if not askUser(result.message, parent=dialog, title="Shortcut Conflict"):
+                return
+
+        # ── Bulk Suggest (browser context) ──
+        result = validate_shortcut(bulk_seq, Context.BROWSER)
+        if not result.is_valid:
+            showInfo(result.message, parent=dialog)
             return
+        if result.severity == Severity.WARNING:
+            if not askUser(result.message, parent=dialog, title="Shortcut Conflict"):
+                return
 
         settings["preserve_deck_structure"] = True
         settings["pull_on_startup"] = pull_on_startup_cb.isChecked()
