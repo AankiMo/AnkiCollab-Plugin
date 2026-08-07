@@ -1028,7 +1028,7 @@ def show_global_settings_dialog(parent_dialog):
     bulk_block, bulk_shortcut_edit = _make_shortcut_block(
         "Bulk Suggest:",
         "shortcut_bulk_suggest",
-        "Must contain at least two modifier keys (e.g. ⌃⌥B). "
+        "Must contain at least two modifier keys (e.g. Ctrl+Alt+U). "
         "Works only in the Browser window.",
     )
     shortcuts_layout.addStretch()
@@ -1106,7 +1106,7 @@ def show_global_settings_dialog(parent_dialog):
         update_seq = update_shortcut_edit.keySequence()
         bulk_seq = bulk_shortcut_edit.keySequence()
 
-        # ── Update Decks (main window context) ──
+        # Update Decks (main window context)
         result = validate_shortcut(update_seq, Context.MAIN_WINDOW)
         if not result.is_valid:
             showInfo(result.message, parent=dialog)
@@ -1115,7 +1115,7 @@ def show_global_settings_dialog(parent_dialog):
             if not askUser(result.message, parent=dialog, title="Shortcut Conflict"):
                 return
 
-        # ── Bulk Suggest (browser context) ──
+        # Bulk Suggest (browser context)
         result = validate_shortcut(bulk_seq, Context.BROWSER)
         if not result.is_valid:
             showInfo(result.message, parent=dialog)
@@ -1259,7 +1259,7 @@ def update_ui_for_login_state():
         refresh_notifications()
 
 def _apply_shortcut_hint():
-    """Append the configured shortcut in native format to the Update Decks action text."""
+    # Append the configured shortcut in native format to the Update Decks action text.
     config = mw.addonManager.getConfig(__name__) or {}
     settings = config.get("settings", {}) if config else {}
     raw = settings.get("shortcut_update_decks", "")
