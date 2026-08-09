@@ -251,8 +251,7 @@ class TestKeyringStorage:
     @patch('auth_manager.keyring.get_password')
     def test_keyring_storage(self, mock_get_pw, mock_set_pw, mw_mock):
         """Test that tokens are stored and retrieved via keyring and not plain text."""
-        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: {"auth": {"expires_timestamp": time.time() + 86400}}
-        
+        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: {"auth": {"expires_timestamp": time.time() + 7 * 86400}}
         am = AuthManager()
         am.store_login_result({
             "token": "secret_token",
