@@ -5,8 +5,6 @@ from anki.decks import DeckId
 from anki.notes import NoteId
 from aqt.qt import *
 from aqt.qt import QMenu, QModelIndex, QCheckBox, QDialogButtonBox, QApplication, QInputDialog
-from anki import hooks
-from anki.collection import Collection
 from aqt.utils import askUser, showInfo
 from aqt.operations import QueryOp
 
@@ -18,7 +16,6 @@ from .media_manager import MediaManager # Import List
 from .export_manager import *
 from .import_manager import *
 from .utils import get_deck_hash_from_card
-from .thread import run_function_in_thread
 
 from .gear_menu_setup import add_browser_menu_item, on_deck_browser_will_show_options_menu
 from .dialogs import AddChangelogDialog, ProtectFieldsDialog

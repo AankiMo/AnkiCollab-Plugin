@@ -143,7 +143,7 @@ def add_to_table(line_edit, table, dialog):
             showInfo(f"You're already subscribed to this deck.\n\nUse 'Update Decks' to get the latest changes.")
             line_edit.setText('')
             return
-                
+
         strings_data[string] = {
             'timestamp': '2022-12-31 23:59:59',
             'deckId': 0,
@@ -1104,7 +1104,7 @@ def store_default_config():
         "push_counter": 0,
         # Add Cards: Suggest on AnkiCollab checkbox
         "remember_suggest_state_between_sessions": False,
-        "suggest_on_ankicollab_last_state": True,
+        "suggest_on_ankicollab_last_state": False,
         # Error reporting (Sentry)
         "error_reporting_enabled": False,
     }
@@ -1172,4 +1172,5 @@ def menu_init():
     community_action.triggered.connect(open_community_site)
     login_manager_action.triggered.connect(on_login_manager_btn)
 
-    update_ui_for_login_state()
+    from aqt import gui_hooks
+    gui_hooks.main_window_did_init.append(update_ui_for_login_state)
