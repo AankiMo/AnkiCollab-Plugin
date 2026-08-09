@@ -25,10 +25,21 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install test dependencies
+      - name: Install dependencies from dist.lock
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          python -c "
+          import json
+          with open('dist.lock') as f:
+              deps = json.load(f)
+          with open('requirements-locked.txt', 'w') as f:
+              for pkg, version in deps.items():
+                  f.write(f'{pkg}=={version}\n')
+          "
+          pip install -r requirements-locked.txt
+
+      - name: Install test-only dependencies
+        run: pip install pytest pytest-asyncio requests-mock
 
       - name: Run tests
         run: python -m pytest --import-mode=importlib tests/
