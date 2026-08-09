@@ -31,5 +31,5 @@ jobs:
           pip install pytest
 
       - name: Run tests
-        run: python -m pytest tests/
+        run: python -m pytest --import-mode=importlib tests/
         working-directory: plugin_source
