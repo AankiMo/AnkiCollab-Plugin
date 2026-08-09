@@ -1,5 +1,5 @@
 import os
-import json
+import sys
 import time
 import requests
 import keyring
@@ -13,14 +13,17 @@ from aqt import mw
 from .var_defs import API_BASE_URL
 
 KEYRING_SERVICE = "AnkiCollab"
-
+        
 class AuthManager:    
     def __init__(self):
         self.config_key = __name__
         self._keyring_available = True
         self._keyring_warned = False
-        self._load_auth_data()
-
+        self.auth_data = {}
+        
+        from aqt import gui_hooks
+        gui_hooks.main_window_did_init.append(self._load_auth_data)
+                    
     def _warn_keyring_fallback_once(self, reason):
         if self._keyring_warned:
             return
