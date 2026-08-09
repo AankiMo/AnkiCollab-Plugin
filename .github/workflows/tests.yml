@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      SKIP_INIT: "1"
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies from dist.lock
+        run: |
+          python -m pip install --upgrade pip
+          python -c "
+          import json
+          with open('dist.lock') as f:
+              deps = json.load(f)
+          with open('requirements-locked.txt', 'w') as f:
+              for pkg, version in deps.items():
+                  f.write(f'{pkg}=={version}\n')
+          "
+          pip install -r requirements-locked.txt
+
+      - name: Install test-only dependencies
+        run: pip install pytest pytest-asyncio requests-mock
+
+      - name: Run tests
+        run: python -m pytest --import-mode=importlib tests/
+        working-directory: plugin_source
