@@ -7,13 +7,12 @@ from .json_serializable import JsonSerializableAnkiDict
 from .note_model import NoteModel
 from .note import Note
 from ..anki.adapters.file_provider import FileProvider
-from anki.models import ChangeNotetypeRequest, NoteType, NotetypeDict, NotetypeId
+from anki.models import ChangeNotetypeRequest, NotetypeId
 from ..importer.import_dialog import ImportConfig
 from ..utils import utils
 from ..utils.constants import UUID_FIELD_NAME
 from ..utils.uuid import UuidFetcher
-from ..utils.notifier import AnkiModalNotifier
-from ...thread import run_function_in_thread, sync_run_async
+from ...thread import sync_run_async
 from ...utils import get_logger, check_collection_or_abort, OperationAbortedError
 import uuid
                                 

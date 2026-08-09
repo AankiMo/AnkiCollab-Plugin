@@ -77,6 +77,7 @@ from .var_defs import API_BASE_URL, DEFAULT_PROTECTED_TAGS
 from .utils import get_deck_hash_from_did, get_deck_hash_from_card, get_local_deck_from_hash, get_timestamp, get_did_from_hash, create_backup, get_logger, is_collection_available, ensure_collection, CollectionUnavailableError, OperationAbortedError, check_collection_or_abort, BackupFailedError, get_personal_tags
 from .media_progress_indicator import show_media_progress, update_media_progress, complete_media_progress
 from . import main
+from .api_client import ApiConnectionError
 from .sentry_integration import capture_media_exception, capture_media_message
 logger = get_logger("ankicollab.export_manager")
 
@@ -1369,6 +1370,11 @@ def suggest_notes(nids: List[int], rationale_id: int, editor: Optional[Any] = No
         logger.info("Starting suggestion process...")
         
         def _on_suggest_failure(e: Exception):
+            if isinstance(e, ApiConnectionError):
+                aqt.utils.showWarning(
+                    str(e), title="AnkiCollab - Connection Error", parent=parent_widget
+                )
+                return
             if not _handle_operation_aborted(e, "Suggestion"):
                 logger.error(f"Suggestion failed: {e}")
                 raise e
@@ -1386,6 +1392,11 @@ def suggest_notes(nids: List[int], rationale_id: int, editor: Optional[Any] = No
         op_prepare.run_in_background()
 
     except Exception as e:
+        if isinstance(e, ApiConnectionError):
+            aqt.utils.showWarning(
+                str(e), title="AnkiCollab - Connection Error", parent=parent_widget
+            )
+            return
         logger.error(f"Error preparing suggestion: {e}")
         logger.error(traceback.format_exc())
         show_exception(parent=parent_widget, exception=e)
@@ -1591,6 +1602,11 @@ def start_suggest_missing_media(webresult: Tuple[str, List[str]]):
         op_optimize.run_in_background()
 
     except Exception as e:
+        if isinstance(e, ApiConnectionError):
+            aqt.utils.showWarning(
+                str(e), title="AnkiCollab - Connection Error", parent=parent_widget
+            )
+            return
         logger.error(f"Error uploading missing media: {e}")
         logger.error(traceback.format_exc())
         capture_media_exception(
@@ -1632,6 +1648,11 @@ def suggest_subdeck(did: int):
         logger.info("Starting subdeck suggestion process...")
         
         def _on_subdeck_suggest_failure(e: Exception):
+            if isinstance(e, ApiConnectionError):
+                aqt.utils.showWarning(
+                    str(e), title="AnkiCollab - Connection Error", parent=parent_widget
+                )
+                return
             if not _handle_operation_aborted(e, "Subdeck Suggestion"):
                 logger.error(f"Subdeck suggestion failed: {e}")
                 raise e
@@ -1649,6 +1670,11 @@ def suggest_subdeck(did: int):
         op_prepare.run_in_background()
 
     except Exception as e:
+        if isinstance(e, ApiConnectionError):
+            aqt.utils.showWarning(
+                str(e), title="AnkiCollab - Connection Error", parent=parent_widget
+            )
+            return
         logger.error(f"Error preparing subdeck suggestion: {e}")
         logger.error(traceback.format_exc())
         show_exception(parent=parent_widget, exception=e)
@@ -1710,6 +1736,11 @@ def handle_export(did: int):
         logger.info("Starting new deck export process...")
         
         def _on_export_failure(e: Exception):
+            if isinstance(e, ApiConnectionError):
+                aqt.utils.showWarning(
+                    str(e), title="AnkiCollab - Connection Error", parent=parent_widget
+                )
+                return
             if not _handle_operation_aborted(e, "Export"):
                 logger.error(f"Export failed: {e}")
                 raise e
@@ -1724,6 +1755,11 @@ def handle_export(did: int):
         op_optimize.run_in_background()
 
     except Exception as e:
+        if isinstance(e, ApiConnectionError):
+            aqt.utils.showWarning(
+                str(e), title="AnkiCollab - Connection Error", parent=parent_widget
+            )
+            return
         logger.error(f"Error preparing deck export: {e}")
         logger.error(traceback.format_exc())
         show_exception(parent=parent_widget, exception=e)
@@ -1892,12 +1928,12 @@ def get_commit_info(default_opt = 0, parent=None):
     dialog.setStyleSheet(get_dialog_style())
     
     layout = QVBoxLayout()
-    layout.setSpacing(12)
+    layout.setSpacing(11)
     layout.setContentsMargins(16, 16, 16, 16)
 
     # Header
     header = QLabel("What type of change is this?")
-    header.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {colors['text_primary']};")
+    header.setStyleSheet(f"font-size: 12px; font-weight: 600; color: {colors['text_primary']};")
     layout.addWidget(header)
 
     # Rationale list
@@ -1929,7 +1965,7 @@ def get_commit_info(default_opt = 0, parent=None):
             background-color: {colors['surface_hover']};
         }}
     """)
-    listWidget.setFixedHeight(145)
+    listWidget.setFixedHeight(195)
     layout.addWidget(listWidget)
 
     # Additional info section
@@ -1971,18 +2007,18 @@ def get_commit_info(default_opt = 0, parent=None):
     buttonLayout = QHBoxLayout()
     buttonLayout.setSpacing(8)
     
+    submitButton = QPushButton("Submit")
+    submitButton.setStyleSheet(get_button_style('success'))
+    submitButton.setCursor(Qt.CursorShape.PointingHandCursor)
+    submitButton.setDefault(True)
+    
     cancelButton = QPushButton("Cancel")
     cancelButton.setStyleSheet(get_button_style("neutral"))
     cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)
     
-    submitButton = QPushButton("Submit")
-    submitButton.setStyleSheet(get_button_style("primary"))
-    submitButton.setCursor(Qt.CursorShape.PointingHandCursor)
-    submitButton.setDefault(True)
-    
     buttonLayout.addStretch()
-    buttonLayout.addWidget(cancelButton)
     buttonLayout.addWidget(submitButton)
+    buttonLayout.addWidget(cancelButton)
     layout.addLayout(buttonLayout)
 
     dialog.setLayout(layout)
@@ -2085,6 +2121,11 @@ def _on_suggest_deck_prepared(
         op_optimize.run_in_background()
 
     except Exception as e:
+        if isinstance(e, ApiConnectionError):
+            aqt.utils.showWarning(
+                str(e), title="AnkiCollab - Connection Error", parent=parent_widget
+            )
+            return
         logger.error(f"Error in deck preparation callback: {e}")
         logger.error(traceback.format_exc())
         show_exception(parent=parent_widget, exception=e)
@@ -2183,6 +2224,11 @@ def _on_suggest_subdeck_prepared(
         op_optimize.run_in_background()
 
     except Exception as e:
+        if isinstance(e, ApiConnectionError):
+            aqt.utils.showWarning(
+                str(e), title="AnkiCollab - Connection Error", parent=parent_widget
+            )
+            return
         logger.error(f"Error in subdeck preparation callback: {e}")
         logger.error(traceback.format_exc())
         show_exception(parent=parent_widget, exception=e)

@@ -538,14 +538,20 @@ class Note(JsonSerializableAnkiObject):
         logger.debug(f"Protected fields by tags handled")
         
         protected_prefixes = import_config.personal_tags
+        protected_prefixes_lower = {
+            prefix.lower() for prefix in protected_prefixes if isinstance(prefix, str)
+        }
         protected_tags = []
         if self.anki_object and hasattr(self.anki_object, "tags"):
             protected_tags = [
                 tag
                 for tag in self.anki_object.tags
                 if (
-                    tag in protected_prefixes
-                    or any(tag.startswith(f"{prefix}::") for prefix in protected_prefixes)
+                    tag.lower() in protected_prefixes_lower
+                    or any(
+                        tag.lower().startswith(f"{prefix}::")
+                        for prefix in protected_prefixes_lower
+                    )
                 )
             ]
         
