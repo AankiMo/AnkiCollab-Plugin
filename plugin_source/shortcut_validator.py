@@ -65,7 +65,7 @@ _ANKI_BROWSER_BLOCKED: Dict[str, str] = {
     "Ctrl+Alt+Shift+C":     "Anki Browser: Cloze deletion — same number (editor)",
 }
 
-# System-level shortcuts
+# System-level shortcuts (blocked level — user cannot override)
 _SYSTEM_BLOCKED: Dict[str, str] = {}
 
 if is_mac:
@@ -74,7 +74,6 @@ if is_mac:
         "Meta+Shift+4":     "macOS: Screenshot (selection)",
         "Meta+Shift+5":     "macOS: Screenshot / recording panel",
         "Meta+Ctrl+Q":      "macOS: Lock Screen",
-        "Meta+Ctrl+F":      "macOS: fill screen",
     })
 
 if is_win:
@@ -93,23 +92,61 @@ if not is_mac and not is_win:
     })
 
 
-# Common add-on shortcuts (warning level — user can override)
-_ADDON_WARNING: Dict[str, str] = {
-    "Ctrl+Alt+O":       "the Image Occlusion Enhanced add-on",
-    "Ctrl+Alt+S":       "the Review Heatmap / Stats add-on",
-    "Ctrl+Alt+R":       "a Reschedule / Reset add-on",
-    "Ctrl+Alt+P":       "a Preview / Card Info add-on",
-    "Ctrl+Alt+L":       "a Layout / Card Info add-on",
-    "Ctrl+Alt+M":       "a Media import add-on",
-    "Ctrl+Alt+D":       "a Deck-related add-on",
-    "Ctrl+Alt+G":       "a Graph / Stats add-on",
-    "Ctrl+Alt+B":       "a Backup / Browse add-on",
-    "Ctrl+Shift+O":     "a Deck overlay add-on",
-    "Ctrl+Shift+T":     "a Tag-related add-on",
-    "Ctrl+Shift+L":     "a Layout / Cloze add-on",
-    "Ctrl+Shift+S":     "a Save / Sync add-on",
-    "Ctrl+Shift+H":     "a Heatmap / Highlight add-on",
-}
+# System-level shortcuts (warning level — user can override)
+_SYSTEM_WARNING: Dict[str, str] = {}
+
+if is_mac:
+    _SYSTEM_WARNING.update({
+        "Meta+Ctrl+F":      "macOS: fill screen",
+        "Meta+Alt+Esc":     "macOS: Force quit applications",
+        "Meta+Alt+H":       "macOS: Hide other applications",
+        "Meta+Alt+M":       "macOS: Minimize all windows of front app",
+        "Ctrl+Alt+Left":    "macOS: Window management — left half / space left",
+        "Ctrl+Alt+Right":   "macOS: Window management — right half / space right",
+        "Ctrl+Alt+Up":      "macOS: Window management — maximize / space up",
+        "Ctrl+Alt+Down":    "macOS: Window management — minimize / space down",
+        "Ctrl+Alt+F":       "macOS: Window management — fill screen (^⌥F)",
+        "Ctrl+Fn+C":        "macOS: Window management — centre (^🌐C)",
+        "Ctrl+Alt+R":       "macOS: Window management — restore previous size (^⌥R)",
+    })
+
+if is_win:
+    _SYSTEM_WARNING.update({
+        "Meta+Ctrl+D":      "Windows: New virtual desktop",
+        "Meta+Ctrl+Left":   "Windows: Switch virtual desktop left",
+        "Meta+Ctrl+Right":  "Windows: Switch virtual desktop right",
+        "Meta+Ctrl+F4":     "Windows: Close virtual desktop",
+        "Meta+Shift+M":     "Windows: Restore minimized windows",
+    })
+
+if not is_mac and not is_win:
+    # Linux — common desktop environment / window manager defaults
+    _SYSTEM_WARNING.update({
+        # GNOME / KDE / Xfce workspace switching
+        "Ctrl+Alt+Left":            "Linux: Switch workspace left (GNOME/KDE/Xfce)",
+        "Ctrl+Alt+Right":           "Linux: Switch workspace right (GNOME/KDE/Xfce)",
+        "Ctrl+Alt+Up":              "Linux: Switch workspace up (GNOME/KDE)",
+        "Ctrl+Alt+Down":            "Linux: Switch workspace down (GNOME/KDE)",
+        "Ctrl+Alt+Shift+Left":      "Linux: Move window to left workspace",
+        "Ctrl+Alt+Shift+Right":     "Linux: Move window to right workspace",
+        "Ctrl+Alt+Shift+Up":        "Linux: Move window to upper workspace",
+        "Ctrl+Alt+Shift+Down":      "Linux: Move window to lower workspace",
+        # GNOME 3+ workspace shortcuts
+        "Meta+Ctrl+Left":           "Linux: Switch workspace left (GNOME)",
+        "Meta+Ctrl+Right":          "Linux: Switch workspace right (GNOME)",
+        "Meta+Ctrl+Up":             "Linux: Switch workspace up (GNOME)",
+        "Meta+Ctrl+Down":           "Linux: Switch workspace down (GNOME)",
+        # GNOME / Pop!_OS window tiling
+        "Meta+Shift+Up":            "Linux: Maximize window (GNOME tile)",
+        "Meta+Shift+Down":          "Linux: Restore / unmaximize window (GNOME tile)",
+        "Meta+Shift+Left":          "Linux: Tile window left",
+        "Meta+Shift+Right":         "Linux: Tile window right",
+        # i3 / sway / Regolith tiling window managers
+        "Meta+Shift+Space":         "Linux: Toggle floating window (i3/sway)",
+        "Meta+Ctrl+Shift+Left":     "Linux: Move window to left workspace (i3/sway)",
+        "Meta+Ctrl+Shift+Right":    "Linux: Move window to right workspace (i3/sway)",
+    })
+
 
 # ---------------------------------------------------------------------------------------
 # internal helpers
@@ -153,7 +190,7 @@ def validate_shortcut(seq: QKeySequence, context: Context) -> ValidationResult:
 
     # Build the effective blacklists for this context
     blocked: Dict[str, str] = dict(_SYSTEM_BLOCKED)
-    warning: Dict[str, str] = dict(_ADDON_WARNING)
+    warning: Dict[str, str] = dict(_SYSTEM_WARNING)
 
     if context == Context.MAIN_WINDOW:
         blocked.update(_ANKI_MAIN_BLOCKED)
