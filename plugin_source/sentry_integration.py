@@ -341,11 +341,6 @@ def init_sentry() -> None:
         except Exception:
             release = "ankicollab@unknown"
 
-    traces_sample_rate_map = {
-        "development": 1.0,
-        "production": 0.05
-    }
-    
     # Configure Sentry
     try:
         sentry_sdk.init(
@@ -353,13 +348,16 @@ def init_sentry() -> None:
             environment=environment,
             release=release,
             send_default_pii=False,
-            traces_sample_rate=traces_sample_rate_map.get(environment, 0.0),
+            traces_sample_rate=0,
             sample_rate=sample_rate,
             include_local_variables=False,
             before_send=_before_send_factory(addon_root),
             before_breadcrumb=_before_breadcrumb_factory(addon_root),
             default_integrations=True,
             shutdown_timeout=0,
+            max_request_body_size="always",
+            send_client_reports=False,
+            auto_session_tracking=False,
         )
 
         # Set useful tags/context
