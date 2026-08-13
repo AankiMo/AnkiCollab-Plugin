@@ -22,9 +22,9 @@ def mock_keyring():
         if service in fake_keyring and username in fake_keyring[service]:
             del fake_keyring[service][username]
             
-    with patch("auth_manager.keyring.set_password", side_effect=mock_set), \
-         patch("auth_manager.keyring.get_password", side_effect=mock_get), \
-         patch("auth_manager.keyring.delete_password", side_effect=mock_delete):
+    with patch("keyring.set_password", side_effect=mock_set, create=True), \
+         patch("keyring.get_password", side_effect=mock_get, create=True), \
+         patch("keyring.delete_password", side_effect=mock_delete, create=True):
         yield fake_keyring
 
 class TestAuthManagerInit:
@@ -247,8 +247,8 @@ class TestLogout:
         assert am.auth_data == {}
 
 class TestKeyringStorage:
-    @patch('auth_manager.keyring.set_password')
-    @patch('auth_manager.keyring.get_password')
+    @patch('keyring.set_password', create=True)
+    @patch('keyring.get_password', create=True)
     def test_keyring_storage(self, mock_get_pw, mock_set_pw, mw_mock):
         """Test that tokens are stored and retrieved via keyring and not plain text."""
         mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: {"auth": {"expires_timestamp": time.time() + 7 * 86400}}
@@ -277,7 +277,7 @@ class TestKeyringStorage:
         mock_get_pw.side_effect = lambda s, u: "secret_token" if u == "token" else "secret_refresh"
         assert am.get_token() == "secret_token"
         
-    @patch('auth_manager.keyring.set_password', side_effect=Exception("keyring locked"))
+    @patch('keyring.set_password', side_effect=Exception("keyring locked"), create=True)
     @patch('auth_manager.aqt.utils.showInfo')
     def test_keyring_fails_aborts(self, mock_showInfo, mock_set_pw, mw_mock):
         mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: {"auth": {}}

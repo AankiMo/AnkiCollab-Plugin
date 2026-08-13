@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import requests
-import keyring
 import logging
 from datetime import datetime
 from aqt import mw
@@ -49,6 +48,7 @@ class AuthManager:
             return
 
         try:
+            import keyring
             token = keyring.get_password(KEYRING_SERVICE, "token")
             if token is not None:
                 self.auth_data["token"] = token
@@ -77,6 +77,7 @@ class AuthManager:
         self._write_auth_config(config_auth)
         
         try:
+            import keyring
             if token is not None:
                 keyring.set_password(KEYRING_SERVICE, "token", token)
             else:
