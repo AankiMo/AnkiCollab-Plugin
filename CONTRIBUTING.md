@@ -29,6 +29,25 @@ Concretely:
   a thumbs up on the approach → then build it, ideally in reviewable chunks rather than one giant
   PR.
 
+## Code formatting
+
+This project uses [Black](https://black.readthedocs.io/) to keep code style consistent. Pull requests are checked automatically in CI, and a PR with unformatted code will fail the `lint` check and be blocked from merging.
+
+Before opening a PR, please format your code locally:
+
+```bash
+pip install black==26.5.1
+black plugin_source/
+```
+
+This will rewrite any files that don't match the project's style. Review the changes, then commit and push as usual.
+
+If you just want to see what *would* change without modifying files:
+
+```bash
+black --check --diff plugin_source/
+```
+
 ## On AI-assisted code
 
 Using AI tools (Copilot, Claude, ChatGPT, etc.) to help you write code is fine — plenty of us do.
