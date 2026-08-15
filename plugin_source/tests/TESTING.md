@@ -10,8 +10,15 @@ python -m pytest tests/ -k utils   # run only tests matching "utils"
 python -m pytest tests/integration -m integration   # run only workflow-level tests
 ```
 
-**Current test count: 640** (CI verifies this against `pytest --collect-only`; if you
+**Current test count: 800** (CI verifies this against `pytest --collect-only`; if you
 add or remove tests, update this number in the same change).
+
+The core data-integrity files (`crowd_anki/representation/deck.py`,
+`crowd_anki/representation/note.py`, `export_manager.py`, `import_manager.py`)
+are also protected by per-file coverage floors enforced by
+`tests/check_core_coverage_floors.py` (run after the coverage step, parsing
+`coverage.xml`). Raise a floor as coverage improves; never lower one without
+an explicit justification in the commit message.
 
 Requires: `pytest`, `pytest-asyncio`, `requests-mock`, `factory-boy`, `pytest-cov`,
 `keyring`, `pygtrie` (all installable via pip).

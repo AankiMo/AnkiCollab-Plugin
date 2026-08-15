@@ -78,6 +78,10 @@ jobs:
             --cov-fail-under=30 \
             tests/
 
+      - name: Check core coverage floors
+        working-directory: plugin_source
+        run: python tests/check_core_coverage_floors.py coverage.xml
+
       - name: Verify documented test count matches reality
         working-directory: plugin_source
         run: |
