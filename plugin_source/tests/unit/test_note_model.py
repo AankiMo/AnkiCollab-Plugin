@@ -7,6 +7,7 @@ These verify the core logic that ensures:
 - Notetype compatibility detection works
 - Duplicate detection finds structural matches
 """
+
 import copy
 import pytest
 from unittest.mock import MagicMock, patch
@@ -16,10 +17,10 @@ from tests.conftest import make_notetype, create_mock_collection, MockAnkiNote
 from crowd_anki.representation.note_model import NoteModel
 from crowd_anki.utils.constants import UUID_FIELD_NAME
 
-
 # ──────────────────────────────────────────────────────────────────────
 # NoteModel construction
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestNoteModelConstruction:
     def test_from_json_roundtrip(self, basic_notetype):
@@ -30,8 +31,15 @@ class TestNoteModelConstruction:
     def test_from_json_preserves_fields(self, complex_notetype):
         nm = NoteModel.from_json(complex_notetype)
         field_names = nm.get_field_names()
-        assert field_names == ["Term", "Definition", "Extra Info", "Image",
-                               "Audio", "Tags Field", "Source"]
+        assert field_names == [
+            "Term",
+            "Definition",
+            "Extra Info",
+            "Image",
+            "Audio",
+            "Tags Field",
+            "Source",
+        ]
 
     def test_from_json_preserves_templates(self, complex_notetype):
         nm = NoteModel.from_json(complex_notetype)
@@ -58,21 +66,31 @@ class TestNoteModelConstruction:
 # Field change detection (_fields_need_update)
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestFieldChangeDetection:
     def _nm(self, notetype):
         return NoteModel(notetype)
 
     def test_identical_fields_no_update(self, basic_notetype):
         nm = self._nm(basic_notetype)
-        assert nm._fields_need_update(
-            basic_notetype["flds"], basic_notetype["flds"]
-        ) is False
+        assert (
+            nm._fields_need_update(basic_notetype["flds"], basic_notetype["flds"])
+            is False
+        )
 
     def test_added_field_needs_update(self, basic_notetype):
         nm = self._nm(basic_notetype)
         new_flds = copy.deepcopy(basic_notetype["flds"])
-        new_flds.append({"name": "Extra", "ord": 2, "sticky": False,
-                         "rtl": False, "font": "Arial", "size": 20})
+        new_flds.append(
+            {
+                "name": "Extra",
+                "ord": 2,
+                "sticky": False,
+                "rtl": False,
+                "font": "Arial",
+                "size": 20,
+            }
+        )
         assert nm._fields_need_update(basic_notetype["flds"], new_flds) is True
 
     def test_removed_field_needs_update(self, basic_notetype):
@@ -101,6 +119,7 @@ class TestFieldChangeDetection:
 # ──────────────────────────────────────────────────────────────────────
 # Intelligent field mapping (_build_intelligent_field_map)
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestIntelligentFieldMapping:
     def _nm(self, notetype):
@@ -143,11 +162,11 @@ class TestIntelligentFieldMapping:
         new_nt = copy.deepcopy(complex_notetype)
         # Remove "Image" (idx 3), add "NewField", reorder
         new_nt["flds"] = [
-            {"name": "Definition", "ord": 0},     # was idx 1
-            {"name": "Term", "ord": 1},            # was idx 0
-            {"name": "NewField", "ord": 2},        # brand new
-            {"name": "Extra Info", "ord": 3},      # was idx 2
-            {"name": "Source", "ord": 4},           # was idx 6
+            {"name": "Definition", "ord": 0},  # was idx 1
+            {"name": "Term", "ord": 1},  # was idx 0
+            {"name": "NewField", "ord": 2},  # brand new
+            {"name": "Extra Info", "ord": 3},  # was idx 2
+            {"name": "Source", "ord": 4},  # was idx 6
         ]
         mapping = nm._build_intelligent_field_map(complex_notetype, new_nt)
         assert mapping[0] == 1  # Definition was at old idx 1
@@ -181,14 +200,27 @@ class TestIntelligentFieldMapping:
 # Safe field merging (_merge_fields_safely)
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestMergeFieldsSafely:
     def test_remote_order_preserved(self, basic_notetype):
         nm = NoteModel(basic_notetype)
         new_flds = [
-            {"name": "Back", "ord": 0, "sticky": False, "rtl": False,
-             "font": "Arial", "size": 20},
-            {"name": "Front", "ord": 1, "sticky": False, "rtl": False,
-             "font": "Arial", "size": 20},
+            {
+                "name": "Back",
+                "ord": 0,
+                "sticky": False,
+                "rtl": False,
+                "font": "Arial",
+                "size": 20,
+            },
+            {
+                "name": "Front",
+                "ord": 1,
+                "sticky": False,
+                "rtl": False,
+                "font": "Arial",
+                "size": 20,
+            },
         ]
         merged = nm._merge_fields_safely(basic_notetype["flds"], new_flds)
         assert merged[0]["name"] == "Back"
@@ -209,8 +241,16 @@ class TestMergeFieldsSafely:
         """User's custom fields should be appended at the end."""
         nm = NoteModel(basic_notetype)
         existing = copy.deepcopy(basic_notetype["flds"])
-        existing.append({"name": "MyNotes", "ord": 2, "sticky": False,
-                         "rtl": False, "font": "Arial", "size": 20})
+        existing.append(
+            {
+                "name": "MyNotes",
+                "ord": 2,
+                "sticky": False,
+                "rtl": False,
+                "font": "Arial",
+                "size": 20,
+            }
+        )
         new_flds = copy.deepcopy(basic_notetype["flds"])  # remote has no MyNotes
         merged = nm._merge_fields_safely(existing, new_flds)
         assert len(merged) == 3
@@ -219,8 +259,16 @@ class TestMergeFieldsSafely:
     def test_ord_values_sequential(self, basic_notetype):
         nm = NoteModel(basic_notetype)
         existing = copy.deepcopy(basic_notetype["flds"])
-        existing.append({"name": "Custom", "ord": 99, "sticky": False,
-                         "rtl": False, "font": "Arial", "size": 20})
+        existing.append(
+            {
+                "name": "Custom",
+                "ord": 99,
+                "sticky": False,
+                "rtl": False,
+                "font": "Arial",
+                "size": 20,
+            }
+        )
         merged = nm._merge_fields_safely(existing, basic_notetype["flds"])
         for i, f in enumerate(merged):
             assert f["ord"] == i
@@ -232,10 +280,22 @@ class TestMergeFieldsSafely:
         existing = copy.deepcopy(nt["flds"])
         # Create malicious new_flds that would corrupt
         new_flds = [
-            {"name": "A", "ord": 0, "sticky": False, "rtl": False,
-             "font": "Arial", "size": 20},
-            {"name": "B", "ord": 1, "sticky": False, "rtl": False,
-             "font": "Arial", "size": 20},
+            {
+                "name": "A",
+                "ord": 0,
+                "sticky": False,
+                "rtl": False,
+                "font": "Arial",
+                "size": 20,
+            },
+            {
+                "name": "B",
+                "ord": 1,
+                "sticky": False,
+                "rtl": False,
+                "font": "Arial",
+                "size": 20,
+            },
         ]
         # This should NOT raise since order is correct
         merged = nm._merge_fields_safely(existing, new_flds)
@@ -245,6 +305,7 @@ class TestMergeFieldsSafely:
 # ──────────────────────────────────────────────────────────────────────
 # Change detection (_detect_changes_needed)
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestChangeDetection:
     def test_identical_no_changes(self, basic_notetype):
@@ -280,20 +341,29 @@ class TestChangeDetection:
     def test_template_count_change_detected(self, basic_notetype):
         nm = NoteModel(copy.deepcopy(basic_notetype))
         nm.anki_dict["tmpls"].append(
-            {"name": "Card 2", "qfmt": "{{Back}}", "afmt": "{{Front}}", "ord": 1})
+            {"name": "Card 2", "qfmt": "{{Back}}", "afmt": "{{Front}}", "ord": 1}
+        )
         assert nm._detect_changes_needed(basic_notetype, False) is True
 
     def test_field_change_detected(self, basic_notetype):
         nm = NoteModel(copy.deepcopy(basic_notetype))
         nm.anki_dict["flds"].append(
-            {"name": "Extra", "ord": 2, "sticky": False, "rtl": False,
-             "font": "Arial", "size": 20})
+            {
+                "name": "Extra",
+                "ord": 2,
+                "sticky": False,
+                "rtl": False,
+                "font": "Arial",
+                "size": 20,
+            }
+        )
         assert nm._detect_changes_needed(basic_notetype, False) is True
 
 
 # ──────────────────────────────────────────────────────────────────────
 # Notetype save to collection
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestSaveToCollection:
     def test_create_new_notetype(self, basic_notetype):
@@ -325,8 +395,16 @@ class TestSaveToCollection:
 
         # Add a field
         updated = copy.deepcopy(basic_notetype)
-        updated["flds"].append({"name": "Hint", "ord": 2, "sticky": False,
-                                "rtl": False, "font": "Arial", "size": 20})
+        updated["flds"].append(
+            {
+                "name": "Hint",
+                "ord": 2,
+                "sticky": False,
+                "rtl": False,
+                "font": "Arial",
+                "size": 20,
+            }
+        )
         nm = NoteModel(updated)
         result, field_map = nm.save_to_collection(col)
         assert field_map is not None
@@ -335,6 +413,7 @@ class TestSaveToCollection:
 # ──────────────────────────────────────────────────────────────────────
 # Notetype compatibility & duplicate detection
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestNotetypeCompatibility:
     def test_identical_notetypes_compatible(self, basic_notetype):
@@ -350,7 +429,8 @@ class TestNotetypeCompatibility:
     def test_different_templates_incompatible(self, basic_notetype):
         nt2 = copy.deepcopy(basic_notetype)
         nt2["tmpls"].append(
-            {"name": "Card 2", "qfmt": "{{Back}}", "afmt": "{{Front}}", "ord": 1})
+            {"name": "Card 2", "qfmt": "{{Back}}", "afmt": "{{Front}}", "ord": 1}
+        )
         nm1 = NoteModel(basic_notetype)
         nm2 = NoteModel(nt2)
         assert nm1.can_merge_with(nm2) is False

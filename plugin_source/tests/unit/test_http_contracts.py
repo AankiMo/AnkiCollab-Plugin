@@ -32,8 +32,13 @@ CREATE_NOTE_LINK_FIELDS = {"subscriber_deck_hash", "base_deck_hash", "note_guids
 NOTE_REMOVAL_FIELDS = {"remote_deck", "note_guids", "commit_text", "force_overwrite"}
 STATS_INFO_FIELDS = {"deck_hash", "review_history"}  # StatsInfo (gzip)
 SUBMIT_CARD_FIELDS = {  # SubmitCardReq (gzip)
-    "remote_deck", "deck_path", "new_name", "deck", "rationale",
-    "commit_text", "force_overwrite",
+    "remote_deck",
+    "deck_path",
+    "new_name",
+    "deck",
+    "rationale",
+    "commit_text",
+    "force_overwrite",
 }
 CREATE_DECK_FIELDS = {"deck"}  # CreateDeckReq (gzip)
 MEDIA_MANIFEST_FIELDS = {"deck_hash", "filenames"}  # MediaManifestRequest
@@ -165,7 +170,11 @@ class TestCreateNewNoteLink:
     def test_no_token_in_payload(self, client):
         with rmock.Mocker() as m:
             m.post(rmock.ANY, json="ok")
-            payload = {"subscriber_deck_hash": "s", "base_deck_hash": "b", "note_guids": []}
+            payload = {
+                "subscriber_deck_hash": "s",
+                "base_deck_hash": "b",
+                "note_guids": [],
+            }
             client.post_json("/CreateNewNoteLink", payload)
             assert "token" not in m.last_request.json()
 
@@ -205,7 +214,7 @@ class TestRequestRemoval:
 
 class TestUploadDeckStats:
     """POST /UploadDeckStats — AuthenticatedUser + String (gzip body)
-    
+
     Backend decompresses to StatsInfo { deck_hash, review_history }.
     """
 
@@ -215,9 +224,7 @@ class TestUploadDeckStats:
             data = {
                 "deck_hash": "h123",
                 "review_history": {
-                    "DeckA": {
-                        "guid1": {"retention": 85, "lapses": 2, "reps": 10}
-                    }
+                    "DeckA": {"guid1": {"retention": 85, "lapses": 2, "reps": 10}}
                 },
             }
             client.post_gzip("/UploadDeckStats", data)
@@ -236,13 +243,15 @@ class TestUploadDeckStats:
     def test_content_type_is_text_plain(self, client):
         with rmock.Mocker() as m:
             m.post(rmock.ANY, text="ok")
-            client.post_gzip("/UploadDeckStats", {"deck_hash": "h", "review_history": {}})
+            client.post_gzip(
+                "/UploadDeckStats", {"deck_hash": "h", "review_history": {}}
+            )
             assert m.last_request.headers["Content-Type"] == "text/plain"
 
 
 class TestSubmitCard:
     """POST /submitCard — Option<AuthenticatedUser> + String (gzip body)
-    
+
     Backend decompresses to SubmitCardReq.
     """
 
@@ -266,8 +275,13 @@ class TestSubmitCard:
         with rmock.Mocker() as m:
             m.post(rmock.ANY, text="ok")
             data = {
-                "remote_deck": "h", "deck_path": "p", "new_name": "n",
-                "deck": "{}", "rationale": 0, "commit_text": "", "force_overwrite": False,
+                "remote_deck": "h",
+                "deck_path": "p",
+                "new_name": "n",
+                "deck": "{}",
+                "rationale": 0,
+                "commit_text": "",
+                "force_overwrite": False,
             }
             client.post_gzip("/submitCard", data)
             body = _decode_gzip_body(m.last_request.text)
@@ -276,7 +290,7 @@ class TestSubmitCard:
 
 class TestCreateDeck:
     """POST /createDeck — AuthenticatedUser + String (gzip body)
-    
+
     Backend decompresses to CreateDeckReq { deck }.
     """
 
@@ -372,6 +386,7 @@ class TestRemoveToken:
         with rmock.Mocker() as m:
             m.post(rmock.ANY, text="ok")
             import requests
+
             requests.post(
                 "https://example.com/removeToken",
                 headers={"Authorization": f"Bearer {TOKEN}"},
@@ -384,6 +399,7 @@ class TestRemoveToken:
         with rmock.Mocker() as m:
             m.post(rmock.ANY, text="ok")
             import requests
+
             requests.post(
                 "https://example.com/removeToken",
                 headers={"Authorization": f"Bearer {TOKEN}"},
@@ -407,6 +423,7 @@ class TestLogin:
         with rmock.Mocker() as m:
             m.post(rmock.ANY, json={"token": "t", "refresh_token": "r"})
             import requests
+
             payload = {"email": "user@test.com", "password": "pass123"}
             requests.post(
                 "https://example.com/login",
@@ -427,7 +444,7 @@ class TestLogin:
 
 class TestRemovedFields:
     """Verify that payloads no longer contain fields removed from backend structs.
-    
+
     These fields were removed in the security audit v2 migration:
     - token (from SubmitCardReq, NoteRemovalReq, SubmitChangelog, etc.)
     - user_hash (from SubscriptionRequest, StatsInfo)
@@ -437,37 +454,62 @@ class TestRemovedFields:
 
     REMOVED_FIELDS = {"token", "user_hash", "username", "user_token"}
 
-    @pytest.mark.parametrize("endpoint,payload", [
-        ("/AddSubscription", {"deck_hash": "h"}),
-        ("/RemoveSubscription", {"deck_hash": "h"}),
-        ("/submitChangelog", {"deck_hash": "h", "changelog": "c"}),
-        ("/CreateDeckLink", {"subscriber_deck_hash": "a", "base_deck_hash": "b"}),
-        ("/CreateNewNoteLink", {"subscriber_deck_hash": "a", "base_deck_hash": "b", "note_guids": []}),
-        ("/requestRemoval", {"remote_deck": "h", "note_guids": [], "commit_text": "", "force_overwrite": False}),
-    ])
+    @pytest.mark.parametrize(
+        "endpoint,payload",
+        [
+            ("/AddSubscription", {"deck_hash": "h"}),
+            ("/RemoveSubscription", {"deck_hash": "h"}),
+            ("/submitChangelog", {"deck_hash": "h", "changelog": "c"}),
+            ("/CreateDeckLink", {"subscriber_deck_hash": "a", "base_deck_hash": "b"}),
+            (
+                "/CreateNewNoteLink",
+                {"subscriber_deck_hash": "a", "base_deck_hash": "b", "note_guids": []},
+            ),
+            (
+                "/requestRemoval",
+                {
+                    "remote_deck": "h",
+                    "note_guids": [],
+                    "commit_text": "",
+                    "force_overwrite": False,
+                },
+            ),
+        ],
+    )
     def test_json_endpoints_no_removed_fields(self, client, endpoint, payload):
         with rmock.Mocker() as m:
             m.post(rmock.ANY, json="ok")
             client.post_json(endpoint, payload)
             sent_keys = set(m.last_request.json().keys())
-            assert sent_keys.isdisjoint(self.REMOVED_FIELDS), (
-                f"{endpoint} still sends removed fields: {sent_keys & self.REMOVED_FIELDS}"
-            )
+            assert sent_keys.isdisjoint(
+                self.REMOVED_FIELDS
+            ), f"{endpoint} still sends removed fields: {sent_keys & self.REMOVED_FIELDS}"
 
-    @pytest.mark.parametrize("endpoint,data", [
-        ("/UploadDeckStats", {"deck_hash": "h", "review_history": {}}),
-        ("/createDeck", {"deck": "{}"}),
-        ("/submitCard", {
-            "remote_deck": "h", "deck_path": "p", "new_name": "n",
-            "deck": "{}", "rationale": 0, "commit_text": "", "force_overwrite": False,
-        }),
-    ])
+    @pytest.mark.parametrize(
+        "endpoint,data",
+        [
+            ("/UploadDeckStats", {"deck_hash": "h", "review_history": {}}),
+            ("/createDeck", {"deck": "{}"}),
+            (
+                "/submitCard",
+                {
+                    "remote_deck": "h",
+                    "deck_path": "p",
+                    "new_name": "n",
+                    "deck": "{}",
+                    "rationale": 0,
+                    "commit_text": "",
+                    "force_overwrite": False,
+                },
+            ),
+        ],
+    )
     def test_gzip_endpoints_no_removed_fields(self, client, endpoint, data):
         with rmock.Mocker() as m:
             m.post(rmock.ANY, text="ok")
             client.post_gzip(endpoint, data)
             body = _decode_gzip_body(m.last_request.text)
             sent_keys = set(body.keys())
-            assert sent_keys.isdisjoint(self.REMOVED_FIELDS), (
-                f"{endpoint} still sends removed fields: {sent_keys & self.REMOVED_FIELDS}"
-            )
+            assert sent_keys.isdisjoint(
+                self.REMOVED_FIELDS
+            ), f"{endpoint} still sends removed fields: {sent_keys & self.REMOVED_FIELDS}"

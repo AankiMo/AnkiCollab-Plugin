@@ -27,12 +27,30 @@ from anki.decks import DeckId
 from .var_defs import API_BASE_URL
 from .api_client import api_client
 
-from .dialogs import ChangelogDialog, DeletedNotesDialog, OptionalTagsDialog, AskShareStatsDialog, RateAddonDialog
+from .dialogs import (
+    ChangelogDialog,
+    DeletedNotesDialog,
+    OptionalTagsDialog,
+    AskShareStatsDialog,
+    RateAddonDialog,
+)
 
 from .crowd_anki.representation import deck_initializer
 from .crowd_anki.importer.import_dialog import ImportConfig
 
-from .utils import create_backup, get_local_deck_from_id, DeckManager, get_logger, get_personal_tags, is_collection_available, ensure_collection, CollectionUnavailableError, OperationAbortedError, check_collection_or_abort, BackupFailedError
+from .utils import (
+    create_backup,
+    get_local_deck_from_id,
+    DeckManager,
+    get_logger,
+    get_personal_tags,
+    is_collection_available,
+    ensure_collection,
+    CollectionUnavailableError,
+    OperationAbortedError,
+    check_collection_or_abort,
+    BackupFailedError,
+)
 
 from .stats import ReviewHistory, on_stats_upload_done, update_stats_timestamp
 
@@ -67,7 +85,9 @@ def _fetch_manifest(manifest_url: str) -> Dict[str, Any]:
         response.raise_for_status()
     except requests.RequestException as exc:
         logger.error("Failed to download cache manifest %s: %s", manifest_url, exc)
-        raise CacheBootstrapError(f"Unable to download cache manifest: {manifest_url}") from exc
+        raise CacheBootstrapError(
+            f"Unable to download cache manifest: {manifest_url}"
+        ) from exc
 
     try:
         return response.json()
@@ -75,32 +95,39 @@ def _fetch_manifest(manifest_url: str) -> Dict[str, Any]:
         logger.error("Invalid JSON received for manifest %s: %s", manifest_url, exc)
         raise CacheBootstrapError("Cache manifest payload is not valid JSON") from exc
 
+
 def _safe_destination(root: Path, relative_path: str) -> Path:
     destination = (root / relative_path).resolve()
     root_resolved = root.resolve()
 
     if os.name == "nt":
         if not str(destination).lower().startswith(str(root_resolved).lower()):
-            raise CacheBootstrapError(f"Media path escapes target directory: {relative_path}")
+            raise CacheBootstrapError(
+                f"Media path escapes target directory: {relative_path}"
+            )
     else:
         if not str(destination).startswith(str(root_resolved)):
-            raise CacheBootstrapError(f"Media path escapes target directory: {relative_path}")
+            raise CacheBootstrapError(
+                f"Media path escapes target directory: {relative_path}"
+            )
 
     return destination
 
 
-def _coerce_subscription_payload(payload: Any, deck_last_modified: Optional[str]) -> Dict[str, Any]:
+def _coerce_subscription_payload(
+    payload: Any, deck_last_modified: Optional[str]
+) -> Dict[str, Any]:
     if isinstance(payload, list):
         payload = next((item for item in payload if isinstance(item, dict)), None)
 
     if not isinstance(payload, dict):
         raise CacheBootstrapError("Cache archive deck data is not a valid object")
-    
+
     if "deck" not in payload:
         raise CacheBootstrapError("Cache archive deck data missing 'deck' field")
 
     subscription = dict(payload)
-    
+
     if deck_last_modified:
         subscription["deck_last_modified"] = deck_last_modified
 
@@ -137,7 +164,7 @@ def _extract_media_entries(archive: zipfile.ZipFile, media_info: Dict[str, Any])
 
         destination = _safe_destination(media_dir, relative_name)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        
+
         if destination.exists():
             # Skip existing files to avoid unnecessary overwrites
             continue
@@ -158,7 +185,9 @@ def _subscription_from_manifest(
     try:
         if not archive_url:
             raise CacheBootstrapError("Cache manifest missing archive URL")
-        response = requests.get(archive_url, stream=True, timeout=DEFAULT_REQUEST_TIMEOUT)
+        response = requests.get(
+            archive_url, stream=True, timeout=DEFAULT_REQUEST_TIMEOUT
+        )
         response.raise_for_status()
     except requests.RequestException as exc:
         logger.error(
@@ -173,7 +202,11 @@ def _subscription_from_manifest(
         tmp_path = Path(tmp_file.name)
         try:
             total_size_str = response.headers.get("Content-Length")
-            total_size = int(total_size_str) if total_size_str and total_size_str.isdigit() else 0
+            total_size = (
+                int(total_size_str)
+                if total_size_str and total_size_str.isdigit()
+                else 0
+            )
             downloaded = 0
             cancelled = False
             last_ui_update = 0.0
@@ -201,7 +234,9 @@ def _subscription_from_manifest(
                     return f"about {hours} h left"
                 return f"about {hours} h {minutes} min left"
 
-            def update_progress(dl_bytes: int, tot_bytes: int, speed_bps: float, elapsed: float) -> None:
+            def update_progress(
+                dl_bytes: int, tot_bytes: int, speed_bps: float, elapsed: float
+            ) -> None:
                 if not getattr(aqt.mw, "progress", None):
                     return
 
@@ -233,7 +268,9 @@ def _subscription_from_manifest(
                     rate_window = now - last_rate_sample_at
                     if rate_window >= 0.5:
                         window_bytes = downloaded - last_rate_sample_bytes
-                        instant_bps = window_bytes / rate_window if rate_window > 0 else 0.0
+                        instant_bps = (
+                            window_bytes / rate_window if rate_window > 0 else 0.0
+                        )
                         if smoothed_bps <= 0:
                             smoothed_bps = instant_bps
                         else:
@@ -247,17 +284,23 @@ def _subscription_from_manifest(
 
                     if should_update:
                         aqt.mw.taskman.run_on_main(
-                            lambda d=downloaded, t=total_size, s=smoothed_bps, e=(now - started_at): update_progress(d, t, s, e)
+                            lambda d=downloaded, t=total_size, s=smoothed_bps, e=(
+                                now - started_at
+                            ): update_progress(d, t, s, e)
                         )
                         last_ui_update = now
 
             if cancelled:
                 response.close()
-                raise OperationAbortedError("Cache bootstrap download cancelled by user")
+                raise OperationAbortedError(
+                    "Cache bootstrap download cancelled by user"
+                )
 
             if downloaded > 0:
                 aqt.mw.taskman.run_on_main(
-                    lambda d=downloaded, t=total_size, s=smoothed_bps, e=(time.monotonic() - started_at): update_progress(d, t, s, e)
+                    lambda d=downloaded, t=total_size, s=smoothed_bps, e=(
+                        time.monotonic() - started_at
+                    ): update_progress(d, t, s, e)
                 )
         finally:
             tmp_file.flush()
@@ -273,9 +316,13 @@ def _subscription_from_manifest(
                 deck_bytes = archive.read(deck_path)
             except KeyError as exc:
                 logger.error(
-                    "Deck data path %s not found in archive for %s", deck_path, deck_hash
+                    "Deck data path %s not found in archive for %s",
+                    deck_path,
+                    deck_hash,
                 )
-                raise CacheBootstrapError("Deck data not present in cache archive") from exc
+                raise CacheBootstrapError(
+                    "Deck data not present in cache archive"
+                ) from exc
 
             compression = (deck_info.get("compression") or "none").lower()
             if compression in {"gzip", "gz"}:
@@ -290,7 +337,9 @@ def _subscription_from_manifest(
                     )
                     raise CacheBootstrapError("Unable to decompress deck data") from exc
             elif compression not in {"none", ""}:
-                raise CacheBootstrapError(f"Unsupported deck compression: {compression}")
+                raise CacheBootstrapError(
+                    f"Unsupported deck compression: {compression}"
+                )
 
             try:
                 deck_payload = json.loads(deck_bytes.decode("utf-8"))
@@ -299,12 +348,16 @@ def _subscription_from_manifest(
                 raise CacheBootstrapError("Deck data is not valid JSON") from exc
 
             deck_last_modified = manifest.get("source_last_update")
-            subscription = _coerce_subscription_payload(deck_payload, deck_last_modified)
+            subscription = _coerce_subscription_payload(
+                deck_payload, deck_last_modified
+            )
 
             media_info = manifest.get("media", {})
             extracted_media = _extract_media_entries(archive, media_info)
             logger.info(
-                "Cache bootstrap for %s extracted %d media files", deck_hash, extracted_media
+                "Cache bootstrap for %s extracted %d media files",
+                deck_hash,
+                extracted_media,
             )
 
             return subscription
@@ -338,7 +391,9 @@ def _resolve_cache_bootstrap_entries(entries: List[Any]) -> List[Any]:
                 deck_hash = entry.get("deck_hash")
 
                 if not manifest_url or not deck_hash:
-                    logger.error("Cache bootstrap entry missing manifest URL or deck hash")
+                    logger.error(
+                        "Cache bootstrap entry missing manifest URL or deck hash"
+                    )
                     raise CacheBootstrapError("Malformed cache bootstrap entry")
 
                 manifest = _fetch_manifest(manifest_url)
@@ -351,14 +406,19 @@ def _resolve_cache_bootstrap_entries(entries: List[Any]) -> List[Any]:
             else:
                 resolved.append(entry)
         except CacheBootstrapError as cbe:
-            logger.exception("CacheBootstrapError while resolving cache bootstrap entry: %s", cbe)
+            logger.exception(
+                "CacheBootstrapError while resolving cache bootstrap entry: %s", cbe
+            )
             raise
         except Exception as exc:
-            logger.exception("Unexpected error while resolving cache bootstrap entry: %s", exc)
+            logger.exception(
+                "Unexpected error while resolving cache bootstrap entry: %s", exc
+            )
             raise
 
     filtered = [entry for entry in resolved if entry is not None]
     return filtered
+
 
 def update_optional_tag_config(given_deck_hash, optional_tags):
     with DeckManager() as decks:
@@ -389,7 +449,10 @@ def update_timestamp(given_deck_hash):
         details = decks.get_by_hash(given_deck_hash)
 
         if details:
-            details["timestamp"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            details["timestamp"] = datetime.now(timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+
 
 def update_deck_stats_enabled(given_deck_hash, stats_enabled):
     with DeckManager() as decks:
@@ -398,48 +461,54 @@ def update_deck_stats_enabled(given_deck_hash, stats_enabled):
         if details:
             details["stats_enabled"] = stats_enabled
             if not stats_enabled:
-                details["last_stats_timestamp"] = 0  # Reset last stats timestamp if stats are disabled
+                details["last_stats_timestamp"] = (
+                    0  # Reset last stats timestamp if stats are disabled
+                )
+
 
 def get_noteids_from_uuids(guids):
     """Get note IDs from GUIDs using prepared statements for better performance."""
     if not mw.col or not guids:
         return []
-    
+
     noteids = []
     try:
         # Process in batches to avoid memory issues with large GUID lists
         batch_size = 1000  # Process 1000 GUIDs at a time
-        
+
         for i in range(0, len(guids), batch_size):
-            batch = guids[i:i + batch_size]
-            
+            batch = guids[i : i + batch_size]
+
             # Use prepared statement with IN clause for batch processing
-            placeholders = ','.join(['?' for _ in batch])
+            placeholders = ",".join(["?" for _ in batch])
             query = f"SELECT id FROM notes WHERE guid IN ({placeholders})"
-            
+
             # Pass parameters using *batch to unpack the list
-            batch_results = mw.col.db.list(query, *batch) # type: ignore
+            batch_results = mw.col.db.list(query, *batch)  # type: ignore
             noteids.extend(batch_results)
-            
+
     except Exception as e:
-        logger.error(f"Error getting note IDs from GUIDs using prepared statements: {e}")
+        logger.error(
+            f"Error getting note IDs from GUIDs using prepared statements: {e}"
+        )
         # Fallback to individual queries if batch processing fails
         for guid in guids:
             try:
                 query = "SELECT id FROM notes WHERE guid = ?"
-                note_id = mw.col.db.scalar(query, guid) # type: ignore
+                note_id = mw.col.db.scalar(query, guid)  # type: ignore
                 if note_id:
                     noteids.append(note_id)
             except Exception as e2:
                 logger.error(f"Error getting note ID for GUID {guid}: {e2}")
                 continue
-    
+
     return noteids
+
 
 def delete_notes(nids):
     if not nids:
         return
-    aqt.mw.col.remove_notes(nids) # type: ignore
+    aqt.mw.col.remove_notes(nids)  # type: ignore
     aqt.mw.col.reset()  # type: ignore # deprecated
     mw.reset()
     aqt.mw.taskman.run_on_main(
@@ -448,6 +517,7 @@ def delete_notes(nids):
         )
     )
 
+
 def get_guids_from_noteids(nids):
     """Get GUIDs from note IDs using prepared statements for better performance."""
     if not mw.col or not nids:
@@ -455,25 +525,27 @@ def get_guids_from_noteids(nids):
     database = mw.col.db
     if not database:
         return []
-    
+
     guids = []
     try:
         # Process in batches to avoid memory issues with large note ID lists
         batch_size = 1000  # Process 1000 note IDs at a time
-        
+
         for i in range(0, len(nids), batch_size):
-            batch = nids[i:i + batch_size]
-            
+            batch = nids[i : i + batch_size]
+
             # Use prepared statement with IN clause for batch processing
-            placeholders = ','.join(['?' for _ in batch])
+            placeholders = ",".join(["?" for _ in batch])
             query = f"SELECT guid FROM notes WHERE id IN ({placeholders})"
-            
+
             # Pass parameters using *batch to unpack the list
             batch_results = database.list(query, *batch)
             guids.extend(batch_results)
-            
+
     except Exception as e:
-        logger.error(f"Error getting GUIDs from note IDs using prepared statements: {e}")
+        logger.error(
+            f"Error getting GUIDs from note IDs using prepared statements: {e}"
+        )
         # Fallback to individual queries if batch processing fails
         query = "SELECT guid FROM notes WHERE id = ?"
         for nid in nids:
@@ -484,7 +556,7 @@ def get_guids_from_noteids(nids):
             except Exception as e2:
                 logger.error(f"Error getting GUID for note ID {nid}: {e2}")
                 continue
-    
+
     return guids
 
 
@@ -496,6 +568,7 @@ def open_browser_with_nids(nids):
         "nid:" + " or nid:".join(str(nid) for nid in nids)
     )
     browser.onSearchActivated()
+
 
 def update_stats() -> None:
     """Update stats for decks where stats sharing is already enabled."""
@@ -511,11 +584,9 @@ def update_stats() -> None:
                 op = QueryOp(
                     parent=mw,
                     op=lambda _: rh.upload_review_history(last_stats_timestamp),
-                    success=on_stats_upload_done
+                    success=on_stats_upload_done,
                 )
-                op.with_progress(
-                    "Uploading Review History..."
-                ).run_in_background()
+                op.with_progress("Uploading Review History...").run_in_background()
                 update_stats_timestamp(deck_hash)
 
 
@@ -533,59 +604,62 @@ def wants_to_share_stats(deck_hash) -> tuple[bool, int]:
 
 def _install_deck_op(deck, config, map_cache=None, note_type_data=None):
     """Background operation to install deck updates.
-    
+
     This function runs in a background thread. It includes collection availability
     checks to abort gracefully if the collection is closed during operation.
     """
     # Use check_collection_or_abort instead of assert for graceful abort
     col = check_collection_or_abort("deck_installation_start")
-        
+
     logger.info("Saving metadata.")
     deck.save_metadata(col, config.home_deck)
-    
+
     # Re-check after metadata save
     check_collection_or_abort("after_metadata_save")
-    
+
     logger.info("Saving decks and notes.")
     # Create media result structure
     med_res = {
-        "success": True, 
+        "success": True,
         "message": f"Unknown Media download error",
         "downloaded": 0,
-        "skipped": 0
+        "skipped": 0,
     }
-    
+
     total_notes = deck.calculate_total_work()
     logger.info(f"Total notes: {total_notes}")
     progress_tracker = deck.create_unified_progress_tracker(total_notes)
     logger.info("Workload calculated, starting bulk save.")
-    
+
     # The save_decks_and_notes_bulk method has its own collection checks
     return deck.save_decks_and_notes_bulk(
         collection=col,
         progress_tracker=progress_tracker,  # Use unified tracker
-        import_config=config
+        import_config=config,
     )
-    
-def _on_deck_installed(install_result, deck, subscription, input_hash=None, update_timestamp_after=False):
+
+
+def _on_deck_installed(
+    install_result, deck, subscription, input_hash=None, update_timestamp_after=False
+):
     """Success callback after deck installation."""
     # Runs on Main Thread
-    
+
     # Re-check collection availability after background operation
     if not is_collection_available():
         logger.warning("Collection became unavailable after deck installation")
         aqt.utils.showWarning(
             "Import may be incomplete: collection became unavailable during the operation.",
-            parent=mw
+            parent=mw,
         )
         return
-    
+
     deck.on_success_wrapper(install_result)
-    
+
     deleted_notes = subscription.get("deleted_notes", [])
     deck_name = deck.anki_dict["name"]
     deck_hash = subscription["deck_hash"]
-    
+
     # unfortunately, the db scalar shits itself when called from the success callback after the deck has been installed
     if deleted_notes:
         logger.info(f"Processing {len(deleted_notes)} deleted notes...")
@@ -600,16 +674,18 @@ def _on_deck_installed(install_result, deck, subscription, input_hash=None, upda
                 delete_notes(deleted_nids)
             elif del_notes_choice == QDialog.DialogCode.Rejected:
                 open_browser_with_nids(deleted_nids)
-            
+
     # Handle new deck registration if input_hash is provided
     if input_hash:
         with DeckManager() as decks:
             details = decks.get_by_hash(input_hash)
-            if details and details["deckId"] == 0 and mw.col:  # should only be the case once when they add a new subscription and never ambiguous
-                details["deckId"] = aqt.mw.col.decks.id(deck_name) # type: ignore
+            if (
+                details and details["deckId"] == 0 and mw.col
+            ):  # should only be the case once when they add a new subscription and never ambiguous
+                details["deckId"] = aqt.mw.col.decks.id(deck_name)  # type: ignore
                 # large decks use cached data that may be a day old, so we need to update the timestamp to force a refresh
                 details["timestamp"] = (
-                        datetime.now(timezone.utc) - timedelta(days=1)
+                    datetime.now(timezone.utc) - timedelta(days=1)
                 ).strftime("%Y-%m-%d %H:%M:%S")
                 details["stats_enabled"] = subscription["stats_enabled"]
     else:
@@ -619,11 +695,13 @@ def _on_deck_installed(install_result, deck, subscription, input_hash=None, upda
     # Update timestamp if requested (for changelog updates)
     if update_timestamp_after:
         update_timestamp(subscription["deck_hash"])
-    
+
     # if the deck was cached, we have the actual last modified time as rfc3339 from the server
     if "deck_last_modified" in subscription:
         try:
-            last_modified_dt = datetime.fromisoformat(subscription["deck_last_modified"].replace("Z", "+00:00"))
+            last_modified_dt = datetime.fromisoformat(
+                subscription["deck_last_modified"].replace("Z", "+00:00")
+            )
             formatted_last_modified = last_modified_dt.strftime("%Y-%m-%d %H:%M:%S")
             with DeckManager() as decks:
                 details = decks.get_by_hash(deck_hash)
@@ -634,6 +712,7 @@ def _on_deck_installed(install_result, deck, subscription, input_hash=None, upda
             # Don't let this error break the import process
             try:
                 import sentry_sdk
+
                 sentry_sdk.capture_exception(e)
             except Exception:
                 pass
@@ -644,8 +723,9 @@ def _on_deck_installed(install_result, deck, subscription, input_hash=None, upda
         _handle_stats_sharing_after_import(deck_hash, deck_name)
 
     mw.reset()  # Reset the main window to reflect changes
-    
+
     return deck_name
+
 
 def _handle_stats_sharing_after_import(deck_hash, deck_name=None):
     """Handle stats sharing dialog after import is complete."""
@@ -654,7 +734,7 @@ def _handle_stats_sharing_after_import(deck_hash, deck_name=None):
             details = decks.get_by_hash(deck_hash)
             if details is None:
                 return
-            
+
             stats_enabled = details.get("share_stats")
             if stats_enabled is None:
                 # Only show dialog if not already decided
@@ -665,7 +745,7 @@ def _handle_stats_sharing_after_import(deck_hash, deck_name=None):
                         stats_enabled = True
                     else:
                         stats_enabled = False
-                    
+
                     if dialog.isChecked():
                         details["share_stats"] = stats_enabled
     except Exception as e:
@@ -673,25 +753,23 @@ def _handle_stats_sharing_after_import(deck_hash, deck_name=None):
         # Don't let this error break the import process
         try:
             import sentry_sdk
+
             sentry_sdk.capture_exception(e)
         except Exception:
             pass
+
 
 def install_update(subscription, input_hash=None, update_timestamp_after=False):
     logger.info(f"Installing update for deck: {subscription['deck_hash']}")
     deck_hash = subscription["deck_hash"]
     parent_widget = QApplication.focusWidget() or mw
-    
-    if check_optional_tag_changes(
-            deck_hash, subscription["optional_tags"]
-    ):
+
+    if check_optional_tag_changes(deck_hash, subscription["optional_tags"]):
         dialog = OptionalTagsDialog(
             get_optional_tags(deck_hash), subscription["optional_tags"], parent=mw
         )
         dialog.exec()
-        update_optional_tag_config(
-            deck_hash, dialog.get_selected_tags()
-        )
+        update_optional_tag_config(deck_hash, dialog.get_selected_tags())
     subscribed_tags = get_optional_tags(deck_hash)
     logger.debug("Optional Tags done.")
     deck = deck_initializer.from_json(subscription["deck"])
@@ -700,15 +778,15 @@ def install_update(subscription, input_hash=None, update_timestamp_after=False):
         subscription["protected_fields"],
         [tag for tag, value in subscribed_tags.items() if value],
         True if subscription["optional_tags"] else False,
-        deck_hash
+        deck_hash,
     )
     logger.debug("Config prepared.")
 
     map_cache = defaultdict(dict)
     note_type_data = {}
-    #deck.handle_notetype_changes(mw.col, map_cache, note_type_data)
+    # deck.handle_notetype_changes(mw.col, map_cache, note_type_data)
     logger.debug("Handled note type changes.")
-    
+
     def _on_install_failure(e: Exception):
         """Handle installation failure, with special handling for graceful aborts."""
         if isinstance(e, OperationAbortedError):
@@ -719,13 +797,13 @@ def install_update(subscription, input_hash=None, update_timestamp_after=False):
                 parent_widget = QApplication.focusWidget() or mw
             except Exception:
                 pass
-            
+
             try:
                 aqt.utils.showInfo(
                     "Import was cancelled because the collection was closed.\n\n"
                     "Please reopen your profile and try again.",
                     parent=parent_widget,
-                    title="Import Cancelled"
+                    title="Import Cancelled",
                 )
             except Exception as dialog_error:
                 # If we can't show a dialog (Anki shutting down), just log it
@@ -734,18 +812,18 @@ def install_update(subscription, input_hash=None, update_timestamp_after=False):
             logger.error(f"Import failed with error: {e}")
             # Let the default error handler show the error
             raise e
-    
+
     # Start QueryOp for collection operations
     op = QueryOp(
         parent=parent_widget,
         op=lambda col: _install_deck_op(deck, config, map_cache, note_type_data),
         success=lambda res: _on_deck_installed(
             res, deck, subscription, input_hash, update_timestamp_after
-        )
+        ),
     ).failure(_on_install_failure)
     op.with_progress("Installing/Updating deck...")
     op.run_in_background()
-        
+
     # Return the deck name (note: this will be returned before the operation completes)
     return deck.anki_dict["name"]
 
@@ -762,7 +840,7 @@ def prep_config(protected_fields, optional_tags, has_optional_tags, deck_hash):
     home_deck = get_home_deck(deck_hash)
     new_notes_home_deck = get_new_notes_home_deck(deck_hash)
     personal_tags = get_personal_tags(deck_hash)
-    
+
     config = ImportConfig(
         optional_tags=optional_tags,
         has_optional_tags=has_optional_tags,
@@ -772,9 +850,10 @@ def prep_config(protected_fields, optional_tags, has_optional_tags, deck_hash):
         suspend_new_cards=get_card_suspension_status(),
         keep_empty_subdecks=get_keep_empty_subdeck_status(),
         home_deck=home_deck or "",  # Provide empty string as default
-        new_notes_home_deck=new_notes_home_deck or "",  # Provide empty string as default
+        new_notes_home_deck=new_notes_home_deck
+        or "",  # Provide empty string as default
         deck_hash=deck_hash,
-        personal_tags=personal_tags
+        personal_tags=personal_tags,
     )
     for protected_field in protected_fields:
         model_name = protected_field["name"]
@@ -790,7 +869,7 @@ def show_changelog_popup(subscription):
     deck_hash = subscription["deck_hash"]
 
     update_deck_stats_enabled(deck_hash, subscription["stats_enabled"])
-    
+
     if changelog:
         dialog = ChangelogDialog(changelog, deck_hash, parent=mw)
         choice = dialog.exec()
@@ -813,33 +892,38 @@ def ask_for_rating():
             strings_data["settings"]["pull_counter"] = pull_counter + 1
             if pull_counter % 30 == 0:  # every 30 pulls
                 last_ratepls = strings_data["settings"]["last_ratepls"]
-                last_ratepls_dt = datetime.strptime(last_ratepls, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+                last_ratepls_dt = datetime.strptime(
+                    last_ratepls, "%Y-%m-%d %H:%M:%S"
+                ).replace(tzinfo=timezone.utc)
                 if (datetime.now(timezone.utc) - last_ratepls_dt).days > 30:
-                    if not strings_data["settings"]["rated_addon"]:  # only ask if they haven't rated the addon yet
-                        strings_data["settings"]["last_ratepls"] = datetime.now(timezone.utc).strftime(
-                            '%Y-%m-%d %H:%M:%S')
+                    if not strings_data["settings"][
+                        "rated_addon"
+                    ]:  # only ask if they haven't rated the addon yet
+                        strings_data["settings"]["last_ratepls"] = datetime.now(
+                            timezone.utc
+                        ).strftime("%Y-%m-%d %H:%M:%S")
                         dialog = RateAddonDialog(parent=mw)
                         dialog.exec()
             mw.addonManager.writeConfig(__name__, strings_data)
 
 
 def import_webresult(data):
-    (webresult, input_hash, silent) = data # gotta unpack the tuple
+    webresult, input_hash, silent = data  # gotta unpack the tuple
 
     # None indicates an error or cancellation path where a dedicated message
     # was already shown (or intentionally suppressed).
     if webresult is None:
         return
-    
+
     # Ensure collection is available before proceeding
     if not is_collection_available():
         aqt.utils.showWarning(
             "Cannot import: Anki collection is not available. "
             "Please ensure a profile is loaded and try again.",
-            parent=mw
+            parent=mw,
         )
         return
-    
+
     # if webresult is empty, tell user that there are no updates
     if not webresult:
         if silent:
@@ -862,7 +946,7 @@ def import_webresult(data):
             "is working correctly and try again.\n\n"
             "No changes have been made to your collection.",
             parent=mw,
-            title="Backup Failed"
+            title="Backup Failed",
         )
         return
 
@@ -920,7 +1004,7 @@ def get_new_notes_home_deck(given_deck_hash):
                 deck_name = mw.col.decks.name_if_exists(new_notes_deck_id)
                 if deck_name:
                     return deck_name
-            
+
             # Fall back to regular home deck
             return get_home_deck(given_deck_hash)
     except Exception as e:
@@ -928,11 +1012,12 @@ def get_new_notes_home_deck(given_deck_hash):
         # Fall back to regular home deck
         try:
             import sentry_sdk
+
             sentry_sdk.capture_exception(e)
         except Exception:
             pass
         return get_home_deck(given_deck_hash)
-    
+
     return None
 
 
@@ -955,12 +1040,16 @@ def remove_nonexistent_decks():
 
         payload = {"deck_hashes": list(strings_data_to_send.keys())}
         try:
-            response = api_client.post_json("/CheckDeckAlive", payload, auth=False, timeout=30)
+            response = api_client.post_json(
+                "/CheckDeckAlive", payload, auth=False, timeout=30
+            )
             if response.status_code == 200:
                 if response.content == "Error":
                     infot = "A Server Error occurred. Please notify us!"
                     aqt.mw.taskman.run_on_main(
-                        lambda: aqt.utils.tooltip(infot, parent=QApplication.focusWidget())
+                        lambda: aqt.utils.tooltip(
+                            infot, parent=QApplication.focusWidget()
+                        )
                     )
                 else:
                     webresult = json.loads(response.content)
@@ -979,6 +1068,7 @@ def remove_nonexistent_decks():
             logger.error(f"Network error checking deck alive: {e}")
             try:
                 import sentry_sdk
+
                 sentry_sdk.capture_exception(e)
             except Exception:
                 pass
@@ -986,6 +1076,7 @@ def remove_nonexistent_decks():
             logger.exception(f"Unexpected error checking deck alive: {e}")
             try:
                 import sentry_sdk
+
                 sentry_sdk.capture_exception(e)
             except Exception:
                 pass
@@ -1000,7 +1091,10 @@ def _remove_subscription_from_config(deck_hash: str) -> None:
     if isinstance(details, dict) and details.get("deckId", 0) == 0:
         del strings_data[deck_hash]
         mw.addonManager.writeConfig(__name__, strings_data)
-        logger.info("Removed pending subscription %s from config after cancellation", deck_hash)
+        logger.info(
+            "Removed pending subscription %s from config after cancellation", deck_hash
+        )
+
 
 # Kinda ugly, but for backwards compatibility we need to handle both the old and new format
 def async_start_pull(input_hash, silent=False):
@@ -1029,7 +1123,9 @@ def async_start_pull(input_hash, silent=False):
             )
 
         try:
-            response = api_client.post_json("/pullChanges", strings_data_to_send, auth=False)
+            response = api_client.post_json(
+                "/pullChanges", strings_data_to_send, auth=False
+            )
             if response.status_code == 200:
                 compressed_data = base64.b64decode(response.content)
                 decompressed_data = gzip.decompress(compressed_data)
@@ -1058,14 +1154,17 @@ def async_start_pull(input_hash, silent=False):
                 _remove_subscription_from_config(input_hash)
             aqt.mw.taskman.run_on_main(
                 lambda: aqt.utils.tooltip(
-                    "Download cancelled.", parent=QApplication.focusWidget(), period=2000
+                    "Download cancelled.",
+                    parent=QApplication.focusWidget(),
+                    period=2000,
                 )
             )
             return (None, None, True)
-        except (requests.exceptions.RequestException, OSError, ValueError, gzip.BadGzipFile, base64.binascii.Error) as e: # type: ignore
+        except (requests.exceptions.RequestException, OSError, ValueError, gzip.BadGzipFile, base64.binascii.Error) as e:  # type: ignore
             logger.error(f"Error pulling changes: {e}")
             try:
                 import sentry_sdk
+
                 sentry_sdk.capture_exception(e)
             except Exception:
                 pass
@@ -1078,6 +1177,7 @@ def async_start_pull(input_hash, silent=False):
             logger.exception(f"Unexpected error pulling changes: {e}")
             try:
                 import sentry_sdk
+
                 sentry_sdk.capture_exception(e)
             except Exception:
                 pass
@@ -1086,11 +1186,11 @@ def async_start_pull(input_hash, silent=False):
                 lambda: aqt.utils.tooltip(infot, parent=QApplication.focusWidget())
             )
             return (None, None, silent)
-        
+
+
 def handle_pull(input_hash, silent=False):
     QueryOp(
         parent=mw,
         op=lambda _: async_start_pull(input_hash, silent),
         success=import_webresult,
     ).with_progress("Fetching Changes from AnkiCollab...").run_in_background()
-    

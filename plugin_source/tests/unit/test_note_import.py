@@ -7,6 +7,7 @@ These verify the critical paths that ensure:
 - Note creation from JSON and update flows work
 - Edge cases like field count mismatches are handled gracefully
 """
+
 import copy
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
@@ -18,13 +19,14 @@ from crowd_anki.representation.note import Note
 from crowd_anki.representation.note_model import NoteModel
 from crowd_anki.utils.constants import UUID_FIELD_NAME
 
-from utils import (    
+from utils import (
     get_personal_tags,
 )
 
 # ──────────────────────────────────────────────────────────────────────
 # Note construction
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestNoteConstruction:
     def test_from_json(self):
@@ -49,13 +51,15 @@ class TestNoteConstruction:
 # handle_import_config_changes — maintainer protected fields
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestMaintainerProtectedFields:
     """Test that fields marked as personal by the maintainer are preserved."""
 
-    def _setup_note_for_import(self, old_fields, new_fields, notetype,
-                                personal_fields=None, field_mapping=None):
+    def _setup_note_for_import(
+        self, old_fields, new_fields, notetype, personal_fields=None, field_mapping=None
+    ):
         """Helper to set up a note for import testing.
-        
+
         Args:
             old_fields: The user's current local fields
             new_fields: The new fields coming from remote
@@ -69,8 +73,10 @@ class TestMaintainerProtectedFields:
         # Set up mock config
         config = MagicMock()
         if personal_fields:
+
             def is_personal(model_name, field_name):
                 return (model_name, field_name) in personal_fields
+
             config.is_personal_field = MagicMock(side_effect=is_personal)
         else:
             config.is_personal_field = MagicMock(return_value=False)
@@ -85,7 +91,7 @@ class TestMaintainerProtectedFields:
         note.anki_object = mock_note
 
         nm = NoteModel(notetype)
-        
+
         if field_mapping is None:
             field_mapping = list(range(len(notetype["flds"])))
 
@@ -150,11 +156,13 @@ class TestMaintainerProtectedFields:
 # handle_import_config_changes — user protected fields (tags)
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestUserProtectedFields:
     """Test that fields users protect via AnkiCollab_Protect tags are preserved."""
 
-    def _setup_protected_note(self, old_fields, new_fields, notetype,
-                               protect_tags, field_mapping=None):
+    def _setup_protected_note(
+        self, old_fields, new_fields, notetype, protect_tags, field_mapping=None
+    ):
         note_dict = make_note_dict(fields=new_fields, tags=["some_tag"])
         note = Note.from_json(note_dict)
 
@@ -229,6 +237,7 @@ class TestUserProtectedFields:
 # Default protected tags (leech, marked, missing-media)
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestDefaultProtectedTags:
     def test_leech_tag_preserved(self):
         nt = make_notetype(fields=["Front", "Back"])
@@ -269,7 +278,7 @@ class TestDefaultProtectedTags:
         fm = [0, 1]
         note.handle_import_config_changes(config, nm, fm)
         assert "marked" in note.anki_object_dict["tags"]
-        
+
     def test_personal_tag_preserved(self):
         nt = make_notetype(fields=["Front", "Back"])
         note_dict = make_note_dict(fields=["new f", "new b"], tags=["test"])
@@ -290,18 +299,22 @@ class TestDefaultProtectedTags:
         note.handle_import_config_changes(config, nm, fm)
         assert "AnkiCollab_Personal::MyTag" in note.anki_object_dict["tags"]
 
+
 # ──────────────────────────────────────────────────────────────────────
 # Optional tags handling
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestOptionalTags:
     def test_optional_tags_filtered(self):
         nt = make_notetype(fields=["Front", "Back"])
         note_dict = make_note_dict(
             fields=["f", "b"],
-            tags=["AnkiCollab_Optional::Pathology",
-                  "AnkiCollab_Optional::Cardiology",
-                  "regular_tag"]
+            tags=[
+                "AnkiCollab_Optional::Pathology",
+                "AnkiCollab_Optional::Cardiology",
+                "regular_tag",
+            ],
         )
         note = Note.from_json(note_dict)
 
@@ -326,6 +339,7 @@ class TestOptionalTags:
 # ──────────────────────────────────────────────────────────────────────
 # Field count mismatch handling
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestFieldCountMismatch:
     def test_extra_fields_truncated(self):
@@ -395,6 +409,7 @@ class TestFieldCountMismatch:
 # Tag removal (for export)
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestTagRemoval:
     def test_remove_exact_tag(self):
         note = Note()
@@ -428,9 +443,10 @@ class TestTagRemoval:
         note.remove_tags(["anything"])
 
 
-# ──────────────────────────────────────────────────────────────────────  
+# ──────────────────────────────────────────────────────────────────────
 # Bulk operations
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestBulkAddNotes:
     @patch("crowd_anki.representation.note.ANKI_INT_VERSION", 231100)

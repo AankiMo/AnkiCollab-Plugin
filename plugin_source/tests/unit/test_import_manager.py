@@ -26,10 +26,10 @@ from import_manager import (
     do_nothing,
 )
 
-
 # ──────────────────────────────────────────────────────────────────────
 # CacheBootstrapError
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestCacheBootstrapError:
     def test_is_runtime_error(self):
@@ -39,6 +39,7 @@ class TestCacheBootstrapError:
 # ──────────────────────────────────────────────────────────────────────
 # _fetch_manifest
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestFetchManifest:
     @patch("import_manager.requests.get")
@@ -55,6 +56,7 @@ class TestFetchManifest:
     @patch("import_manager.requests.get")
     def test_network_error(self, mock_get):
         import requests
+
         mock_get.side_effect = requests.RequestException("timeout")
         with pytest.raises(CacheBootstrapError, match="Unable to download"):
             _fetch_manifest("http://example.com/manifest.json")
@@ -73,6 +75,7 @@ class TestFetchManifest:
 # ──────────────────────────────────────────────────────────────────────
 # _safe_destination
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestSafeDestination:
     def test_normal_path(self, tmp_path):
@@ -96,6 +99,7 @@ class TestSafeDestination:
 # ──────────────────────────────────────────────────────────────────────
 # _coerce_subscription_payload
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestCoerceSubscriptionPayload:
     def test_dict_with_deck_key(self):
@@ -130,6 +134,7 @@ class TestCoerceSubscriptionPayload:
 # ──────────────────────────────────────────────────────────────────────
 # _extract_media_entries
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestExtractMediaEntries:
     def test_extracts_files(self, tmp_path, mw_mock):
@@ -197,6 +202,7 @@ class TestExtractMediaEntries:
 # Optional tags
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestOptionalTags:
     @pytest.fixture(autouse=True)
     def _deck_config(self, mw_mock):
@@ -228,6 +234,7 @@ class TestOptionalTags:
 # Note ID / GUID lookups
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestNoteIdLookups:
     def test_get_noteids_empty_input(self, mw_mock):
         assert get_noteids_from_uuids([]) == []
@@ -256,6 +263,7 @@ class TestNoteIdLookups:
 # wants_to_share_stats
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestWantsToShareStats:
     def test_unknown_deck_returns_false(self, mw_mock):
         mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: {"settings": {}}
@@ -282,6 +290,7 @@ class TestWantsToShareStats:
 # ──────────────────────────────────────────────────────────────────────
 # do_nothing
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestDoNothing:
     def test_returns_none(self):

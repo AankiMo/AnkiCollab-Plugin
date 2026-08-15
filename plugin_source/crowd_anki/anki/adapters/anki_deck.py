@@ -6,7 +6,7 @@ from typing import Callable
 class AnkiDeck:
     _data: dict
 
-    deck_name_separator = '::'
+    deck_name_separator = "::"
 
     @property
     def data(self):
@@ -14,8 +14,8 @@ class AnkiDeck:
 
     @property
     def is_dynamic(self):
-        return bool(self.data['dyn'])
+        return bool(self.data["dyn"])
 
     @property
     def name(self):
-        return self.data['name']
+        return self.data["name"]

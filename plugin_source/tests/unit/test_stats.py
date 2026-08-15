@@ -13,7 +13,11 @@ class TestReviewHistoryInit:
     def _setup_config(self, mw_mock):
         config = {
             "settings": {},
-            "hash_stats": {"deckId": 7, "timestamp": "2025-01-01 00:00:00", "last_stats_timestamp": 0},
+            "hash_stats": {
+                "deckId": 7,
+                "timestamp": "2025-01-01 00:00:00",
+                "last_stats_timestamp": 0,
+            },
         }
         mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(config)
         mw_mock.col.decks.children.return_value = []
@@ -134,7 +138,11 @@ class TestUpdateStatsTimestamp:
         stored = {}
         config = {
             "settings": {},
-            "hash_ts": {"deckId": 1, "timestamp": "2025-01-01 00:00:00", "last_stats_timestamp": 0},
+            "hash_ts": {
+                "deckId": 1,
+                "timestamp": "2025-01-01 00:00:00",
+                "last_stats_timestamp": 0,
+            },
         }
         mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(config)
 

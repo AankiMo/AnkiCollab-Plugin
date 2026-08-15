@@ -9,18 +9,21 @@ by the protected-fields system.
 Also covers: deleted notes dialog behavior, backup-before-import
 verification, and the note update pipeline's boundaries.
 """
+
 import copy
 import pytest
 from unittest.mock import MagicMock, patch, call, PropertyMock
 from collections import defaultdict
 
 from tests.conftest import (
-    make_notetype, make_note_dict, make_deck_json,
-    MockAnkiNote, create_mock_collection,
+    make_notetype,
+    make_note_dict,
+    make_deck_json,
+    MockAnkiNote,
+    create_mock_collection,
 )
 from crowd_anki.representation.note import Note
 from crowd_anki.representation.note_model import NoteModel
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Review / scheduling data preservation
@@ -82,9 +85,7 @@ class TestSchedulingDataPreservation:
         assert note.anki_object.fields == ["updated front", "updated back"]
 
         # Simulate what _bulk_update_notes_preserving_placement does
-        Note._bulk_update_notes_preserving_placement(
-            col, [note], {}, config
-        )
+        Note._bulk_update_notes_preserving_placement(col, [note], {}, config)
 
         # collection.update_notes was called with note objects
         col.update_notes.assert_called_once()
@@ -102,8 +103,18 @@ class TestSchedulingDataPreservation:
         note_dict = make_note_dict(fields=["F", "B"])
         note = Note.from_json(note_dict)
 
-        scheduling_keys = {"ivl", "due", "reps", "lapses", "factor", "queue",
-                           "type", "odue", "odid", "left"}
+        scheduling_keys = {
+            "ivl",
+            "due",
+            "reps",
+            "lapses",
+            "factor",
+            "queue",
+            "type",
+            "odue",
+            "odid",
+            "left",
+        }
         actual_keys = set(note.anki_object_dict.keys())
         overlap = actual_keys & scheduling_keys
         assert overlap == set(), f"Server note dict contains scheduling keys: {overlap}"
@@ -216,9 +227,11 @@ class TestDeletedNotesDialogCodes:
 
         if del_notes_choice == 1:
             from import_manager import delete_notes
+
             delete_notes(nids)
         elif del_notes_choice == 0:
             from import_manager import open_browser_with_nids
+
             open_browser_with_nids(nids)
 
         mock_delete.assert_called_once_with(nids)
@@ -236,9 +249,11 @@ class TestDeletedNotesDialogCodes:
         del_notes_choice = mock_dialog.exec()
         if del_notes_choice == 1:
             from import_manager import delete_notes
+
             delete_notes(nids)
         elif del_notes_choice == 0:
             from import_manager import open_browser_with_nids
+
             open_browser_with_nids(nids)
 
         mock_delete.assert_not_called()
@@ -256,9 +271,11 @@ class TestDeletedNotesDialogCodes:
         del_notes_choice = mock_dialog.exec()
         if del_notes_choice == 1:
             from import_manager import delete_notes
+
             delete_notes(nids)
         elif del_notes_choice == 0:
             from import_manager import open_browser_with_nids
+
             open_browser_with_nids(nids)
 
         mock_delete.assert_not_called()
@@ -288,8 +305,9 @@ class TestBackupBeforeImport:
     @patch("import_manager.aqt")
     @patch("import_manager.mw")
     @patch("import_manager.create_backup")
-    def test_backup_called_before_import(self, mock_backup, mock_mw, mock_aqt,
-                                          mock_stats):
+    def test_backup_called_before_import(
+        self, mock_backup, mock_mw, mock_aqt, mock_stats
+    ):
         """create_backup(critical=True) must be called before processing subscriptions."""
         from import_manager import import_webresult
 
@@ -299,8 +317,9 @@ class TestBackupBeforeImport:
 
         webresult = [{"deck_hash": "testhash", "deck": {}}]
 
-        with patch("import_manager.install_update"), \
-             patch("import_manager.show_changelog_popup"):
+        with patch("import_manager.install_update"), patch(
+            "import_manager.show_changelog_popup"
+        ):
             try:
                 import_webresult((webresult, None, True))
             except Exception:
@@ -312,8 +331,9 @@ class TestBackupBeforeImport:
     @patch("import_manager.aqt")
     @patch("import_manager.mw")
     @patch("import_manager.create_backup")
-    def test_import_aborted_when_backup_fails(self, mock_backup, mock_mw, mock_aqt,
-                                               mock_stats):
+    def test_import_aborted_when_backup_fails(
+        self, mock_backup, mock_mw, mock_aqt, mock_stats
+    ):
         """If backup fails (critical=True raises), import must NOT proceed."""
         from utils import BackupFailedError
 
@@ -325,9 +345,11 @@ class TestBackupBeforeImport:
         def track_install(*args, **kwargs):
             call_log.append("install_called")
 
-        with patch("import_manager.install_update", side_effect=track_install), \
-             patch("import_manager.show_changelog_popup", side_effect=track_install):
+        with patch("import_manager.install_update", side_effect=track_install), patch(
+            "import_manager.show_changelog_popup", side_effect=track_install
+        ):
             from import_manager import import_webresult
+
             import_webresult(([{"deck_hash": "h"}], None, True))
 
         # install_update should never have been called
@@ -365,8 +387,9 @@ class TestBulkUpdatePipeline:
         nm = NoteModel(nt)
 
         note_dict = make_note_dict(
-            guid="existing_guid", fields=["remote front", "remote back"],
-            note_id=99999  # Remote server's note ID — must NOT be used
+            guid="existing_guid",
+            fields=["remote front", "remote back"],
+            note_id=99999,  # Remote server's note ID — must NOT be used
         )
         note = Note.from_json(note_dict)
 
@@ -396,10 +419,18 @@ class TestBulkUpdatePipeline:
             mock_note.id = id  # AnkiNote(collection, id=existing_id)
             return mock_note
 
-        with patch("crowd_anki.representation.deck.AnkiNote", side_effect=make_anki_note):
+        with patch(
+            "crowd_anki.representation.deck.AnkiNote", side_effect=make_anki_note
+        ):
             deck._batch_process_notes(
-                [note], col, nm, [0, 1], config, 1700000001,
-                is_new=False, existing_note_map=existing_note_map
+                [note],
+                col,
+                nm,
+                [0, 1],
+                config,
+                1700000001,
+                is_new=False,
+                existing_note_map=existing_note_map,
             )
 
         # The note should have the local ID, not the remote's 99999
@@ -413,8 +444,7 @@ class TestBulkUpdatePipeline:
         nm = NoteModel(nt)
 
         note_dict = make_note_dict(
-            guid="new_guid", fields=["front", "back"],
-            note_id=88888
+            guid="new_guid", fields=["front", "back"], note_id=88888
         )
         note = Note.from_json(note_dict)
 
@@ -423,6 +453,7 @@ class TestBulkUpdatePipeline:
         mock_note.tags = []
 
         from crowd_anki.representation.deck import Deck
+
         deck = Deck.__new__(Deck)
 
         config = MagicMock()
@@ -431,8 +462,14 @@ class TestBulkUpdatePipeline:
 
         with patch("crowd_anki.representation.note.AnkiNote", return_value=mock_note):
             deck._batch_process_notes(
-                [note], col, nm, [0, 1], config, 1700000001,
-                is_new=True, existing_note_map={}
+                [note],
+                col,
+                nm,
+                [0, 1],
+                config,
+                1700000001,
+                is_new=True,
+                existing_note_map={},
             )
 
         # Original ID should be saved separately for potential restoration

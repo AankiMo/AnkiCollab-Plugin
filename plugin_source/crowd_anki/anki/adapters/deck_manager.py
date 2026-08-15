@@ -28,10 +28,12 @@ class AnkiStaticDeckManager(DeckManager):
     internal_deck_manager: Any
 
     def all(self) -> Iterable[AnkiDeck]:
-        return seq(self.internal_deck_manager.all()) \
-            .map(lambda d: AnkiDeck(d)) \
-            .filter(lambda d: not d.is_dynamic) \
+        return (
+            seq(self.internal_deck_manager.all())
+            .map(lambda d: AnkiDeck(d))
+            .filter(lambda d: not d.is_dynamic)
             .to_list()
+        )
 
     def leaf_decks(self, overrides: Iterable[AnkiDeck] = tuple()) -> Iterable[AnkiDeck]:
         deck_trie = self.deck_trie()
@@ -43,4 +45,6 @@ class AnkiStaticDeckManager(DeckManager):
         return [deck_trie[key] for key in keys]
 
     def deck_trie(self):
-        return StringTrie(**self.decks_by_name(), separator=AnkiDeck.deck_name_separator)
+        return StringTrie(
+            **self.decks_by_name(), separator=AnkiDeck.deck_name_separator
+        )

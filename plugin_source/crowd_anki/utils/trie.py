@@ -17,8 +17,6 @@ def remove_children_of(trie: Trie, keys):
     def delete_key(key):
         del trie[key]
 
-    seq(keys) \
-        .filter(lambda key: key in trie) \
-        .flat_map(lambda key: trie.keys(prefix=key)) \
-        .filter(lambda key: key not in keys) \
-        .for_each(delete_key)
+    seq(keys).filter(lambda key: key in trie).flat_map(
+        lambda key: trie.keys(prefix=key)
+    ).filter(lambda key: key not in keys).for_each(delete_key)

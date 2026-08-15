@@ -56,7 +56,9 @@ logger.info("AnkiCollab Add-on Loading...")
 # Initialize Sentry (no-op if disabled/missing)
 try:
     if obsolete_version_of_sentry_sdk():
-        logger.info("Obsolete version of sentry-sdk detected. Error reporting disabled.")
+        logger.info(
+            "Obsolete version of sentry-sdk detected. Error reporting disabled."
+        )
     else:
         logger.info("Initializing Sentry for error reporting.")
         init_sentry()
@@ -70,14 +72,13 @@ if strings_data is not None:
     mw.addonManager.writeConfig(__name__, strings_data)
     strings_data = mw.addonManager.getConfig(__name__)
 
-media_manager = MediaManager(
-    api_base_url=API_BASE_URL,
-    media_folder=""
-)
+media_manager = MediaManager(api_base_url=API_BASE_URL, media_folder="")
 
 if point_version() < 50:
     logger.error("Anki version unsupported.")
-    raise RuntimeError("AnkiCollab does not run on this version. Please update to a newer version.")
+    raise RuntimeError(
+        "AnkiCollab does not run on this version. Please update to a newer version."
+    )
 
 try:
     menu_init()
@@ -86,6 +87,7 @@ except Exception as e:
     logger.error(f"Failed to initialize menu: {e}", exc_info=True)
     try:
         import sentry_sdk
+
         sentry_sdk.capture_exception(e)
     except Exception:
         pass
@@ -97,6 +99,7 @@ except Exception as e:
     logger.error(f"Failed to initialize hooks: {e}", exc_info=True)
     try:
         import sentry_sdk
+
         sentry_sdk.capture_exception(e)
     except Exception:
         pass

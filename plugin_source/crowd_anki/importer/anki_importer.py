@@ -9,7 +9,12 @@ import aqt.utils
 import yaml
 
 from ..representation import deck_initializer
-from ..utils.constants import DECK_FILE_NAME, DECK_FILE_EXTENSION, MEDIA_SUBDIRECTORY_NAME, IMPORT_CONFIG_NAME
+from ..utils.constants import (
+    DECK_FILE_NAME,
+    DECK_FILE_EXTENSION,
+    MEDIA_SUBDIRECTORY_NAME,
+    IMPORT_CONFIG_NAME,
+)
 from aqt.qt import QDialog
 
 

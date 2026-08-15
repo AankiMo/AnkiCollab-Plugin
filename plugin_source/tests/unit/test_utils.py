@@ -23,10 +23,10 @@ from utils import (
     create_backup,
 )
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Exception classes
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestExceptions:
     def test_collection_unavailable_is_exception(self):
@@ -46,6 +46,7 @@ class TestExceptions:
 # ──────────────────────────────────────────────────────────────────────
 # ensure_collection / is_collection_available / check_collection_or_abort
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestCollectionAvailability:
     def test_ensure_collection_success(self, mw_mock):
@@ -74,6 +75,7 @@ class TestCollectionAvailability:
 # ──────────────────────────────────────────────────────────────────────
 # DeckManager
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestDeckManager:
     @pytest.fixture
@@ -129,6 +131,7 @@ class TestDeckManager:
 # ──────────────────────────────────────────────────────────────────────
 # Lookup helpers
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestLookupHelpers:
     @pytest.fixture(autouse=True)
@@ -250,6 +253,7 @@ class TestGetDeckHashFromCard:
 # get_deck_and_subdecks
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestGetDeckAndSubdecks:
     def test_returns_empty_for_invalid_ids(self, mw_mock):
         assert get_deck_and_subdecks(None) == []
@@ -276,6 +280,7 @@ class TestGetDeckAndSubdecks:
 # get_logger
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestGetLogger:
     def test_returns_logger(self):
         lg = get_logger("test_module")
@@ -289,6 +294,7 @@ class TestGetLogger:
 # ──────────────────────────────────────────────────────────────────────
 # create_backup
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestCreateBackup:
     def test_raises_value_error_bg_and_critical(self, mw_mock):

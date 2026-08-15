@@ -5,6 +5,7 @@ from being imported by pytest's package-collection mechanism.
 We register a dummy package module in sys.modules before pytest can
 attempt to import it.
 """
+
 import os
 import sys
 import types
@@ -21,13 +22,34 @@ ADDONS_DIR = str(ADDON_ROOT.parent)
 
 # ── Fake aqt / anki / sentry_sdk modules ──────────────────────────────
 _FAKE_MODULES = [
-    "aqt", "aqt.qt", "aqt.utils", "aqt.gui_hooks", "aqt.operations",
-    "aqt.operations.note", "aqt.operations.tag", "aqt.browser", "aqt.editor",
-    "aqt.reviewer", "aqt.addcards", "aqt.sound", "aqt.theme", "aqt.errors",
-    "aqt.dialogs", "aqt.emptycards",
-    "anki", "anki.collection", "anki.consts", "anki.decks", "anki.errors",
-    "anki.hooks", "anki.models", "anki.notes", "anki.cards", "anki.utils",
-    "anki.sound", "anki.exporting",
+    "aqt",
+    "aqt.qt",
+    "aqt.utils",
+    "aqt.gui_hooks",
+    "aqt.operations",
+    "aqt.operations.note",
+    "aqt.operations.tag",
+    "aqt.browser",
+    "aqt.editor",
+    "aqt.reviewer",
+    "aqt.addcards",
+    "aqt.sound",
+    "aqt.theme",
+    "aqt.errors",
+    "aqt.dialogs",
+    "aqt.emptycards",
+    "anki",
+    "anki.collection",
+    "anki.consts",
+    "anki.decks",
+    "anki.errors",
+    "anki.hooks",
+    "anki.models",
+    "anki.notes",
+    "anki.cards",
+    "anki.utils",
+    "anki.sound",
+    "anki.exporting",
     "sentry_sdk",
 ]
 
@@ -39,7 +61,7 @@ for _mod_name in _FAKE_MODULES:
 # note.py calls ``point_version()`` at module level and compares the result
 # to integer constants.  A MagicMock would fail the ``>=`` comparison.
 _anki_utils = sys.modules["anki.utils"]
-_anki_utils.point_version = MagicMock(return_value=250100)   # pretend Anki 25.01
+_anki_utils.point_version = MagicMock(return_value=250100)  # pretend Anki 25.01
 _anki_utils.is_win = True
 _anki_utils.join_fields = lambda fields: "\x1f".join(fields)
 _anki_utils.split_fields = lambda s: s.split("\x1f")
@@ -48,17 +70,21 @@ _anki_utils.ids2str = lambda ids: "(%s)" % ",".join(str(i) for i in ids)
 # --- Fake 'functional' (PyFunctional) package used by crowd_anki/utils/uuid.py ---
 if "functional" not in sys.modules:
     _functional_mock = types.ModuleType("functional")
+
     # seq() should iterate over a list and support .find()
     class _FakeSeq:
         def __init__(self, iterable=None):
             self._data = list(iterable) if iterable else []
+
         def find(self, predicate):
             for item in self._data:
                 if predicate(item):
                     return item
             return None
+
         def __iter__(self):
             return iter(self._data)
+
     _functional_mock.seq = _FakeSeq
     sys.modules["functional"] = _functional_mock
 
@@ -68,7 +94,9 @@ if _anki_models is None:
     _anki_models = MagicMock()
     sys.modules["anki.models"] = _anki_models
 for _sym in ("ChangeNotetypeRequest", "NoteType", "NotetypeDict", "NotetypeId"):
-    if not hasattr(_anki_models, _sym) or isinstance(getattr(_anki_models, _sym), MagicMock):
+    if not hasattr(_anki_models, _sym) or isinstance(
+        getattr(_anki_models, _sym), MagicMock
+    ):
         setattr(_anki_models, _sym, MagicMock())
 
 # --- Fake anki.collection.AddNoteRequest used conditionally by note.py ---
@@ -76,7 +104,9 @@ _anki_collection = sys.modules.get("anki.collection")
 if _anki_collection is None:
     _anki_collection = MagicMock()
     sys.modules["anki.collection"] = _anki_collection
-if not hasattr(_anki_collection, "AddNoteRequest") or isinstance(getattr(_anki_collection, "AddNoteRequest"), MagicMock):
+if not hasattr(_anki_collection, "AddNoteRequest") or isinstance(
+    getattr(_anki_collection, "AddNoteRequest"), MagicMock
+):
     setattr(_anki_collection, "AddNoteRequest", MagicMock())
 
 # Wire up aqt.qt symbols used via ``from aqt.qt import *``
@@ -88,41 +118,83 @@ _qt_mod.qtmajor = 6
 # MagicMock *instances* cannot serve as base classes in Python 3, so we
 # provide lightweight classes for the Qt types that addon modules inherit from.
 
+
 class _StubQThread:
     """Minimal stub for QThread so subclasses can define class bodies."""
-    def __init__(self, *a, **kw): pass
-    def start(self): pass
-    def isRunning(self): return False
+
+    def __init__(self, *a, **kw):
+        pass
+
+    def start(self):
+        pass
+
+    def isRunning(self):
+        return False
+
 
 class _StubQDialog:
     """Minimal stub for QDialog."""
-    def __init__(self, *a, **kw): pass
-    def setWindowTitle(self, *a): pass
-    def resize(self, *a): pass
-    def exec(self): pass
-    def accept(self): pass
-    def close(self): pass
-    def raise_(self): pass
-    def activateWindow(self): pass
+
+    def __init__(self, *a, **kw):
+        pass
+
+    def setWindowTitle(self, *a):
+        pass
+
+    def resize(self, *a):
+        pass
+
+    def exec(self):
+        pass
+
+    def accept(self):
+        pass
+
+    def close(self):
+        pass
+
+    def raise_(self):
+        pass
+
+    def activateWindow(self):
+        pass
+
 
 class _StubQWebEnginePage:
     """Minimal stub for QWebEnginePage."""
-    def __init__(self, *a, **kw): pass
+
+    def __init__(self, *a, **kw):
+        pass
+
     def acceptNavigationRequest(self, url, nav_type, is_main_frame):
         return True
-    def runJavaScript(self, *a): pass
+
+    def runJavaScript(self, *a):
+        pass
+
 
 class _StubQWebEngineView:
     """Minimal stub for QWebEngineView."""
-    def __init__(self, *a, **kw): pass
-    def setPage(self, *a): pass
-    def page(self): return None
+
+    def __init__(self, *a, **kw):
+        pass
+
+    def setPage(self, *a):
+        pass
+
+    def page(self):
+        return None
+
     loadFinished = MagicMock()
-    def load(self, *a): pass
+
+    def load(self, *a):
+        pass
+
 
 def _stub_pyqtSignal(*args, **kwargs):
     """Return a MagicMock descriptor that acts like pyqtSignal."""
     return MagicMock()
+
 
 _qt_mod.QThread = _StubQThread
 _qt_mod.QDialog = _StubQDialog
@@ -131,15 +203,40 @@ _qt_mod.QWebEngineView = _StubQWebEngineView
 _qt_mod.pyqtSignal = _stub_pyqtSignal
 
 for _sym in (
-    "QVBoxLayout", "QHBoxLayout", "QGroupBox", "QLabel",
-    "Qt", "QWidget", "QToolButton", "QLineEdit", "QPushButton",
-    "QListWidget", "QAbstractItemView", "QShortcut", "QKeySequence",
-    "QTextEdit", "QCheckBox", "QApplication", "QMessageBox", "QMenu",
+    "QVBoxLayout",
+    "QHBoxLayout",
+    "QGroupBox",
+    "QLabel",
+    "Qt",
+    "QWidget",
+    "QToolButton",
+    "QLineEdit",
+    "QPushButton",
+    "QListWidget",
+    "QAbstractItemView",
+    "QShortcut",
+    "QKeySequence",
+    "QTextEdit",
+    "QCheckBox",
+    "QApplication",
+    "QMessageBox",
+    "QMenu",
     "QAction",
-    "QtWidgets", "QFont", "QSize", "QListWidgetItem", "QIcon",
-    "QPixmap", "QColor", "QSizePolicy", "QSpacerItem",
-    "QHeaderView", "QTableWidget", "QTableWidgetItem",
-    "QUrl", "QTimer", "QTextBrowser",
+    "QtWidgets",
+    "QFont",
+    "QSize",
+    "QListWidgetItem",
+    "QIcon",
+    "QPixmap",
+    "QColor",
+    "QSizePolicy",
+    "QSpacerItem",
+    "QHeaderView",
+    "QTableWidget",
+    "QTableWidgetItem",
+    "QUrl",
+    "QTimer",
+    "QTextBrowser",
 ):
     if not hasattr(_qt_mod, _sym):
         setattr(_qt_mod, _sym, MagicMock())
@@ -277,12 +374,25 @@ for _name in _ADDON_MODULES_ORDERED:
 
 # Tell pytest not to try collecting the addon's own files as tests
 collect_ignore_glob = [
-    "main.py", "menu.py", "hooks.py", "dialogs.py",
-    "export_manager.py", "import_manager.py", "media_manager.py",
-    "auth_manager.py", "identifier.py", "stats.py", "thread.py",
-    "utils.py", "var_defs.py", "sentry_integration.py",
-    "media_exporter.py", "media_export.py", "media_import.py",
-    "media_optimizer.py", "media_progress_indicator.py",
+    "main.py",
+    "menu.py",
+    "hooks.py",
+    "dialogs.py",
+    "export_manager.py",
+    "import_manager.py",
+    "media_manager.py",
+    "auth_manager.py",
+    "identifier.py",
+    "stats.py",
+    "thread.py",
+    "utils.py",
+    "var_defs.py",
+    "sentry_integration.py",
+    "media_exporter.py",
+    "media_export.py",
+    "media_import.py",
+    "media_optimizer.py",
+    "media_progress_indicator.py",
     "gear_menu_setup.py",
     "notifications_center.py",
     "crowd_anki/*",

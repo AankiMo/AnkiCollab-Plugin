@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, PropertyMock, patch
 
-
 # ---------------------------------------------------------------------------
 # Lightweight Anki type stand-ins
 # ---------------------------------------------------------------------------
+
 
 class FakeNote:
     """Minimal stand-in for ``anki.notes.Note``."""
@@ -90,6 +90,7 @@ class FakeCol:
 # Main mock builder
 # ---------------------------------------------------------------------------
 
+
 def create_mock_mw(
     *,
     config: Optional[Dict[str, Any]] = None,
@@ -138,6 +139,7 @@ def create_mock_mw(
     addon_mgr.writeConfig = MagicMock(side_effect=_write_config)
     # Return the actual addon package name instead of hardcoded ID
     from pathlib import Path
+
     _addon_root = Path(__file__).resolve().parent.parent
     addon_mgr.addonFromModule = MagicMock(return_value=_addon_root.name)
     addon_mgr.addonsFolder = MagicMock(return_value="")
@@ -160,6 +162,7 @@ def create_mock_mw(
 # ---------------------------------------------------------------------------
 # Patch helpers
 # ---------------------------------------------------------------------------
+
 
 def patch_aqt_mw(mw_mock: MagicMock):
     """Return a context-manager / decorator that patches ``aqt.mw`` globally.

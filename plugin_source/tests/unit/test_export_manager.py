@@ -16,10 +16,10 @@ from export_manager import (
 )
 from utils import OperationAbortedError
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Constants
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestExportConstants:
     def test_async_media_ref_threshold_positive(self):
@@ -32,6 +32,7 @@ class TestExportConstants:
 # ──────────────────────────────────────────────────────────────────────
 # Media regex patterns
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestMediaRegexes:
     # ---- sound patterns ----
@@ -114,6 +115,7 @@ class TestMediaRegexes:
 # _is_valid_media_file
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestIsValidMediaFile:
     def test_valid_file(self, tmp_path):
         f = tmp_path / "valid.png"
@@ -141,6 +143,7 @@ class TestIsValidMediaFile:
 # _filter_valid_filename_mapping
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestFilterValidFilenameMapping:
     def test_empty_mapping(self):
         assert _filter_valid_filename_mapping({}) == {}
@@ -167,6 +170,7 @@ class TestFilterValidFilenameMapping:
 # ──────────────────────────────────────────────────────────────────────
 # _handle_operation_aborted
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestHandleOperationAborted:
     @patch("export_manager.aqt.utils.showInfo")

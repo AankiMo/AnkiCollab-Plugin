@@ -29,5 +29,6 @@ class DeckConfig(JsonSerializableAnkiDict):
         self.anki_dict = config_dict
 
     def fetch_or_create_config(self, collection):
-        return UuidFetcher(collection).get_deck_config(self.get_uuid()) or \
-               collection.decks.add_config(self.anki_dict["name"])
+        return UuidFetcher(collection).get_deck_config(
+            self.get_uuid()
+        ) or collection.decks.add_config(self.anki_dict["name"])

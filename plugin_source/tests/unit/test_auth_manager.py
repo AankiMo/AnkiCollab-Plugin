@@ -6,26 +6,28 @@ from unittest.mock import MagicMock, patch
 
 from auth_manager import AuthManager
 
+
 @pytest.fixture(autouse=True)
 def mock_keyring():
     fake_keyring = {}
-    
+
     def mock_set(service, username, password):
         if service not in fake_keyring:
             fake_keyring[service] = {}
         fake_keyring[service][username] = password
-        
+
     def mock_get(service, username):
         return fake_keyring.get(service, {}).get(username, None)
-        
+
     def mock_delete(service, username):
         if service in fake_keyring and username in fake_keyring[service]:
             del fake_keyring[service][username]
-            
-    with patch("keyring.set_password", side_effect=mock_set, create=True), \
-         patch("keyring.get_password", side_effect=mock_get, create=True), \
-         patch("keyring.delete_password", side_effect=mock_delete, create=True):
+
+    with patch("keyring.set_password", side_effect=mock_set, create=True), patch(
+        "keyring.get_password", side_effect=mock_get, create=True
+    ), patch("keyring.delete_password", side_effect=mock_delete, create=True):
         yield fake_keyring
+
 
 class TestAuthManagerInit:
     def test_loads_empty_auth_data_when_no_config(self, mw_mock):
@@ -48,10 +50,12 @@ class TestStoreLoginResult:
         return AuthManager()
 
     def test_stores_token_and_refresh(self, am):
-        result = am.store_login_result({
-            "token": "tok_123",
-            "refresh_token": "ref_456",
-        })
+        result = am.store_login_result(
+            {
+                "token": "tok_123",
+                "refresh_token": "ref_456",
+            }
+        )
         assert result is True
         assert am.auth_data["token"] == "tok_123"
         assert am.auth_data["refresh_token"] == "ref_456"
@@ -65,27 +69,33 @@ class TestStoreLoginResult:
 
     def test_stores_numeric_expires_at(self, am):
         future_ts = time.time() + 86400
-        am.store_login_result({
-            "token": "t",
-            "refresh_token": "r",
-            "expires_at": future_ts,
-        })
+        am.store_login_result(
+            {
+                "token": "t",
+                "refresh_token": "r",
+                "expires_at": future_ts,
+            }
+        )
         assert am.auth_data["expires_timestamp"] == pytest.approx(future_ts)
 
     def test_stores_iso_string_expires_at(self, am):
-        am.store_login_result({
-            "token": "t",
-            "refresh_token": "r",
-            "expires_at": "2099-01-01T00:00:00Z",
-        })
+        am.store_login_result(
+            {
+                "token": "t",
+                "refresh_token": "r",
+                "expires_at": "2099-01-01T00:00:00Z",
+            }
+        )
         assert am.auth_data["expires_timestamp"] > time.time()
 
     def test_fallback_on_bad_expires(self, am):
-        am.store_login_result({
-            "token": "t",
-            "refresh_token": "r",
-            "expires_at": object(),  # invalid type
-        })
+        am.store_login_result(
+            {
+                "token": "t",
+                "refresh_token": "r",
+                "expires_at": object(),  # invalid type
+            }
+        )
         # Should fall back to 30-day window
         expected_min = time.time() + 29 * 86400
         assert am.auth_data["expires_timestamp"] >= expected_min
@@ -117,7 +127,13 @@ class TestShouldRefreshToken:
 class TestGetToken:
     @pytest.fixture
     def am(self, mw_mock):
-        cfg = {"auth": {"token": "valid", "refresh_token": "r", "expires_timestamp": time.time() + 7 * 86400}}
+        cfg = {
+            "auth": {
+                "token": "valid",
+                "refresh_token": "r",
+                "expires_timestamp": time.time() + 7 * 86400,
+            }
+        }
         mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(cfg)
         return AuthManager()
 
@@ -132,11 +148,13 @@ class TestGetToken:
     @patch("auth_manager.requests.post")
     def test_auto_refreshes_near_expiry(self, mock_post, mw_mock):
         """get_token refreshes transparently when token is near expiry."""
-        cfg = {"auth": {
-            "token": "old_tok",
-            "refresh_token": "ref",
-            "expires_timestamp": time.time() + 100,  # < 1 day → triggers refresh
-        }}
+        cfg = {
+            "auth": {
+                "token": "old_tok",
+                "refresh_token": "ref",
+                "expires_timestamp": time.time() + 100,  # < 1 day → triggers refresh
+            }
+        }
         mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(cfg)
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -246,47 +264,51 @@ class TestLogout:
         am.logout()
         assert am.auth_data == {}
 
+
 class TestKeyringStorage:
-    @patch('keyring.set_password', create=True)
-    @patch('keyring.get_password', create=True)
+    @patch("keyring.set_password", create=True)
+    @patch("keyring.get_password", create=True)
     def test_keyring_storage(self, mock_get_pw, mock_set_pw, mw_mock):
         """Test that tokens are stored and retrieved via keyring and not plain text."""
-        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: {"auth": {"expires_timestamp": time.time() + 7 * 86400}}
+        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: {
+            "auth": {"expires_timestamp": time.time() + 7 * 86400}
+        }
         am = AuthManager()
-        am.store_login_result({
-            "token": "secret_token",
-            "refresh_token": "secret_refresh",
-            "expires_at": time.time() + 86400
-        })
-        
+        am.store_login_result(
+            {
+                "token": "secret_token",
+                "refresh_token": "secret_refresh",
+                "expires_at": time.time() + 86400,
+            }
+        )
+
         # Should be called
         mock_set_pw.assert_any_call("AnkiCollab", "token", "secret_token")
         mock_set_pw.assert_any_call("AnkiCollab", "refresh_token", "secret_refresh")
-        
+
         # But NOT saved in config
         write_call = mw_mock.addonManager.writeConfig.call_args
         if write_call:
             saved_auth = write_call.args[1]["auth"]
             assert "token" not in saved_auth
             assert "refresh_token" not in saved_auth
-        
-        am.auth_data = getattr(am, 'auth_data', {})
+
+        am.auth_data = getattr(am, "auth_data", {})
         if "token" in am.auth_data:
             del am.auth_data["token"]
-        
-        mock_get_pw.side_effect = lambda s, u: "secret_token" if u == "token" else "secret_refresh"
+
+        mock_get_pw.side_effect = lambda s, u: (
+            "secret_token" if u == "token" else "secret_refresh"
+        )
         assert am.get_token() == "secret_token"
-        
-    @patch('keyring.set_password', side_effect=Exception("keyring locked"), create=True)
-    @patch('auth_manager.aqt.utils.showInfo')
+
+    @patch("keyring.set_password", side_effect=Exception("keyring locked"), create=True)
+    @patch("auth_manager.aqt.utils.showInfo")
     def test_keyring_fails_aborts(self, mock_showInfo, mock_set_pw, mw_mock):
         mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: {"auth": {}}
         am = AuthManager()
         with pytest.raises(Exception, match="keyring locked"):
-            am.store_login_result({
-                "token": "secret",
-                "refresh_token": "secret"
-            })
-            
+            am.store_login_result({"token": "secret", "refresh_token": "secret"})
+
         assert mock_showInfo.called
         assert "storage" in mock_showInfo.call_args.args[0].lower()

@@ -15,10 +15,10 @@ from notifications_center import (
     _POLL_INTERVAL_MS,
 )
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────────────────
+
 
 def _make_unread_payload(count=3, groups=None):
     """Build a minimal unread payload dict."""
@@ -45,6 +45,7 @@ def _make_history_payload(items=None):
 # ──────────────────────────────────────────────────────────────────────
 # Badge text (_set_unread_count)
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestUnreadBadge:
     @pytest.fixture
@@ -85,6 +86,7 @@ class TestUnreadBadge:
 # schedule_refresh — guards and thread spawning
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestScheduleRefresh:
     @pytest.fixture
     def manager(self):
@@ -109,7 +111,9 @@ class TestScheduleRefresh:
         manager.schedule_refresh()
 
         MockThread.assert_called_once()
-        thread_instance.fetched.connect.assert_called_once_with(manager._on_unread_fetched)
+        thread_instance.fetched.connect.assert_called_once_with(
+            manager._on_unread_fetched
+        )
         thread_instance.start.assert_called_once()
 
     @patch("notifications_center.auth_manager")
@@ -128,6 +132,7 @@ class TestScheduleRefresh:
 # _on_unread_fetched callback
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestOnUnreadFetched:
     def test_stores_payload_and_updates_badge(self):
         mgr = NotificationCenterManager()
@@ -143,6 +148,7 @@ class TestOnUnreadFetched:
 # ──────────────────────────────────────────────────────────────────────
 # attach — menu integration and poll timer
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestAttach:
     def test_creates_action_and_timer(self, mw_mock):
@@ -171,6 +177,7 @@ class TestAttach:
 # set_visible
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestSetVisible:
     def test_delegates_to_action(self):
         mgr = NotificationCenterManager()
@@ -187,6 +194,7 @@ class TestSetVisible:
 # ──────────────────────────────────────────────────────────────────────
 # _mark_as_read — collects IDs and POSTs
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestMarkAsRead:
     @patch("notifications_center.api_client")
@@ -252,6 +260,7 @@ class TestMarkAsRead:
 # open_center — login gate and re-use
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestOpenCenter:
     @patch("notifications_center.showInfo")
     @patch("notifications_center.auth_manager")
@@ -277,6 +286,7 @@ class TestOpenCenter:
 # ──────────────────────────────────────────────────────────────────────
 # _refresh_center_payload — thread guard
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestRefreshCenterPayload:
     @patch("notifications_center._CenterFetchThread")
@@ -308,6 +318,7 @@ class TestRefreshCenterPayload:
 # _on_center_payload callback
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestOnCenterPayload:
     def test_forwards_to_dialog(self):
         mgr = NotificationCenterManager()
@@ -328,6 +339,7 @@ class TestOnCenterPayload:
 # ──────────────────────────────────────────────────────────────────────
 # NotificationCenterDialog — payload rendering
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestDialogPayload:
     @pytest.fixture
@@ -367,7 +379,9 @@ class TestDialogPayload:
 
     def test_render_skipped_when_not_loaded(self, mw_mock):
         d = NotificationCenterDialog(
-            unread_payload={}, history_payload={}, commit_snapshots={},
+            unread_payload={},
+            history_payload={},
+            commit_snapshots={},
         )
         d._web = MagicMock()
         d._web_loaded = False  # not loaded yet
@@ -377,7 +391,9 @@ class TestDialogPayload:
 
     def test_render_skipped_when_no_web(self, mw_mock):
         d = NotificationCenterDialog(
-            unread_payload={}, history_payload={}, commit_snapshots={},
+            unread_payload={},
+            history_payload={},
+            commit_snapshots={},
         )
         d._web = None
         d._render_payload()  # should not raise
@@ -409,11 +425,14 @@ class TestDialogPayload:
 # NotificationCenterDialog — _handle_refresh
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestDialogRefresh:
     def test_calls_on_refresh_callback(self, mw_mock):
         callback = MagicMock()
         d = NotificationCenterDialog(
-            unread_payload={}, history_payload={}, commit_snapshots={},
+            unread_payload={},
+            history_payload={},
+            commit_snapshots={},
             on_refresh=callback,
         )
         d._handle_refresh()
@@ -421,7 +440,9 @@ class TestDialogRefresh:
 
     def test_no_callback_does_not_raise(self, mw_mock):
         d = NotificationCenterDialog(
-            unread_payload={}, history_payload={}, commit_snapshots={},
+            unread_payload={},
+            history_payload={},
+            commit_snapshots={},
             on_refresh=None,
         )
         d._handle_refresh()  # no-op
@@ -431,11 +452,14 @@ class TestDialogRefresh:
 # NotificationCenterDialog — _handle_open_guid
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestDialogOpenGuid:
     @pytest.fixture
     def dialog(self, mw_mock):
         d = NotificationCenterDialog(
-            unread_payload={}, history_payload={}, commit_snapshots={},
+            unread_payload={},
+            history_payload={},
+            commit_snapshots={},
         )
         d.accept = MagicMock()
         return d
@@ -489,6 +513,7 @@ class TestDialogOpenGuid:
 # _NotificationPage — URL interception
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestNotificationPage:
     @pytest.fixture
     def page(self):
@@ -532,6 +557,7 @@ class TestNotificationPage:
 # ──────────────────────────────────────────────────────────────────────
 # _UnreadFetchThread.run
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestUnreadFetchThread:
     @patch("notifications_center.api_client")
@@ -586,6 +612,7 @@ class TestUnreadFetchThread:
 # _CenterFetchThread.run
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestCenterFetchThread:
     @patch("notifications_center.api_client")
     def test_fetches_all_endpoints(self, mock_api):
@@ -594,7 +621,9 @@ class TestCenterFetchThread:
 
         history_resp = MagicMock(status_code=200)
         history_resp.json.return_value = {
-            "total": 2, "offset": 0, "limit": 200,
+            "total": 2,
+            "offset": 0,
+            "limit": 200,
             "items": [
                 {"commit_id": 10, "event": "x"},
                 {"commit_id": 20, "event": "y"},
@@ -633,7 +662,9 @@ class TestCenterFetchThread:
     def test_deduplicates_commit_ids(self, mock_api):
         history_resp = MagicMock(status_code=200)
         history_resp.json.return_value = {
-            "total": 3, "offset": 0, "limit": 200,
+            "total": 3,
+            "offset": 0,
+            "limit": 200,
             "items": [
                 {"commit_id": 10},
                 {"commit_id": 10},
@@ -659,7 +690,8 @@ class TestCenterFetchThread:
 
         # Should only fetch commit 10 once
         snapshot_calls = [
-            c for c in mock_api.get.call_args_list
+            c
+            for c in mock_api.get.call_args_list
             if c[0][0].startswith("/GetCommitSnapshot")
         ]
         assert len(snapshot_calls) == 1
@@ -673,9 +705,10 @@ class TestCenterFetchThread:
             if path == "/GetNotifications":
                 return MagicMock(status_code=500)
             if path.startswith("/GetNotificationsHistory"):
-                return MagicMock(status_code=200, json=MagicMock(
-                    return_value={"total": 0, "items": []}
-                ))
+                return MagicMock(
+                    status_code=200,
+                    json=MagicMock(return_value={"total": 0, "items": []}),
+                )
             return MagicMock(status_code=404)
 
         mock_api.get.side_effect = get_side_effect
@@ -696,10 +729,12 @@ class TestCenterFetchThread:
 # Public convenience functions
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestPublicFunctions:
     @patch("notifications_center.notification_center")
     def test_init_calls_attach(self, mock_nc):
         from notifications_center import init_notification_center
+
         menu = MagicMock()
         init_notification_center(menu)
         mock_nc.attach.assert_called_once_with(menu)
@@ -707,12 +742,14 @@ class TestPublicFunctions:
     @patch("notifications_center.notification_center")
     def test_refresh_calls_schedule(self, mock_nc):
         from notifications_center import refresh_notifications
+
         refresh_notifications()
         mock_nc.schedule_refresh.assert_called_once()
 
     @patch("notifications_center.notification_center")
     def test_set_visibility_calls_set_visible(self, mock_nc):
         from notifications_center import set_notification_visibility
+
         set_notification_visibility(True)
         mock_nc.set_visible.assert_called_once_with(True)
 
@@ -721,11 +758,13 @@ class TestPublicFunctions:
 # register_sync_refresh_hook
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestSyncRefreshHook:
     @patch("notifications_center.notification_center")
     @patch("notifications_center.gui_hooks")
     def test_registers_hook(self, mock_hooks, mock_nc):
         from notifications_center import register_sync_refresh_hook
+
         register_sync_refresh_hook()
         mock_hooks.sync_did_finish.append.assert_called_once()
 
@@ -738,6 +777,7 @@ class TestSyncRefreshHook:
 # ──────────────────────────────────────────────────────────────────────
 # Poll interval constant
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestConstants:
     def test_poll_interval_is_five_minutes(self):

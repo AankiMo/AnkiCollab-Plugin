@@ -24,6 +24,7 @@ logger = get_logger("ankicollab.api_client")
 
 class ApiConnectionError(requests.exceptions.ConnectionError):
     """Raised when the client cannot connect to the AnkiCollab server."""
+
     pass
 
 
@@ -43,12 +44,14 @@ class _ApiClient:
     def _get_token(self) -> str:
         """Lazily import ``auth_manager`` to avoid circular imports."""
         from .auth_manager import auth_manager
+
         return auth_manager.get_token()
 
     def _check_for_auth_failure(self, response: requests.Response) -> None:
         """If *response* is 401, clear local credentials and warn the user."""
         if response.status_code == 401:
             from .auth_manager import auth_manager
+
             auth_manager.handle_auth_failure()
 
     def _request(
@@ -68,7 +71,10 @@ class _ApiClient:
             response = requests.request(method, url, **kwargs)
             self._check_for_auth_failure(response)
             return response
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as exc:
             logger.warning(
                 "Network error during %s %s: %s",
                 method.upper(),

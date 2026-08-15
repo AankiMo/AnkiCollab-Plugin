@@ -6,6 +6,7 @@ These verify:
 - Image optimization availability detection
 - Edge cases in filename handling
 """
+
 import pytest
 from unittest.mock import MagicMock, patch
 import os
@@ -23,10 +24,10 @@ from media_optimizer import (
     FORMAT_TO_EXTENSION,
 )
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Filename validation
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestIsAllowedFilename:
     """Validates the safety criteria for filenames matching the Rust backend."""
@@ -117,6 +118,7 @@ class TestIsAllowedFilename:
 # Filename sanitization
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestSanitizeFilename:
     def test_valid_filename_unchanged(self):
         assert sanitize_filename("good_file.png") == "good_file.png"
@@ -151,13 +153,15 @@ class TestSanitizeFilename:
         for ext in ALLOWED_EXTENSIONS:
             filename = f"test_file.{ext}"
             result = sanitize_filename(filename)
-            assert result is not None and result is not False, \
-                f"Extension .{ext} should be allowed but got {result}"
+            assert (
+                result is not None and result is not False
+            ), f"Extension .{ext} should be allowed but got {result}"
 
 
 # ──────────────────────────────────────────────────────────────────────
 # Optimization availability
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestOptimizationAvailability:
     def test_can_optimize_returns_bool(self):
@@ -167,21 +171,24 @@ class TestOptimizationAvailability:
     def test_optimizable_extensions_subset(self):
         """All optimizable extensions should be in the full allowed list."""
         for ext in OPTIMIZABLE_INPUT_EXTENSIONS:
-            bare = ext.lstrip('.')
-            assert bare in ALLOWED_EXTENSIONS, \
-                f"Optimizable ext {ext} not in allowed list"
+            bare = ext.lstrip(".")
+            assert (
+                bare in ALLOWED_EXTENSIONS
+            ), f"Optimizable ext {ext} not in allowed list"
 
     def test_format_to_extension_mapping(self):
         """All format mappings should produce known extensions."""
         for fmt, ext in FORMAT_TO_EXTENSION.items():
-            bare = ext.lstrip('.')
-            assert bare in ALLOWED_EXTENSIONS, \
-                f"Format {fmt} maps to {ext} which is not allowed"
+            bare = ext.lstrip(".")
+            assert (
+                bare in ALLOWED_EXTENSIONS
+            ), f"Format {fmt} maps to {ext} which is not allowed"
 
 
 # ──────────────────────────────────────────────────────────────────────
 # Edge cases
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestEdgeCases:
     def test_exactly_5_chars_minimum(self):

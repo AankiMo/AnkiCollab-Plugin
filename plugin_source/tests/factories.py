@@ -13,10 +13,10 @@ from typing import Any, Dict, List
 
 import factory
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _random_guid() -> str:
     return uuid.uuid4().hex[:10]
@@ -30,6 +30,7 @@ def _random_hash() -> str:
 # Deck / Subscription
 # ---------------------------------------------------------------------------
 
+
 class SubscriptionFactory(factory.Factory):
     """Builds a *dict* matching the shape returned by the backend manifest."""
 
@@ -39,7 +40,9 @@ class SubscriptionFactory(factory.Factory):
     deck_hash = factory.LazyFunction(_random_hash)
     deck_name = factory.Sequence(lambda n: f"Test Deck {n}")
     human_hash = factory.LazyAttribute(lambda o: o.deck_name.replace(" ", "_").lower())
-    timestamp = factory.LazyFunction(lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
+    timestamp = factory.LazyFunction(
+        lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    )
     optional_tags = factory.LazyFunction(dict)
     protected_fields = factory.LazyFunction(dict)
     protected_tags = factory.LazyFunction(list)
@@ -52,7 +55,9 @@ class DeckConfigFactory(factory.Factory):
         model = dict
 
     deckId = factory.Sequence(lambda n: n + 1)
-    timestamp = factory.LazyFunction(lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
+    timestamp = factory.LazyFunction(
+        lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    )
     optional_tags = factory.LazyFunction(dict)
     stats_enabled = False
     share_stats = False
@@ -62,6 +67,7 @@ class DeckConfigFactory(factory.Factory):
 # ---------------------------------------------------------------------------
 # Notes
 # ---------------------------------------------------------------------------
+
 
 class NoteInfoFactory(factory.Factory):
     """Produces a dict that looks like what Anki returns from ``col.get_note()``."""
@@ -94,6 +100,7 @@ class NotePayloadFactory(factory.Factory):
 # Media
 # ---------------------------------------------------------------------------
 
+
 class MediaEntryFactory(factory.Factory):
     """A single media-file metadata dict used by the media manager."""
 
@@ -103,12 +110,15 @@ class MediaEntryFactory(factory.Factory):
     filename = factory.Sequence(lambda n: f"image_{n}.png")
     file_hash = factory.LazyFunction(_random_hash)
     file_size = factory.LazyAttribute(lambda o: 1024 * (hash(o.filename) % 100 + 1))
-    download_url = factory.LazyAttribute(lambda o: f"https://media.example.com/{o.filename}")
+    download_url = factory.LazyAttribute(
+        lambda o: f"https://media.example.com/{o.filename}"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
+
 
 class LoginResultFactory(factory.Factory):
     """Backend login / token-refresh response."""
@@ -118,12 +128,15 @@ class LoginResultFactory(factory.Factory):
 
     token = factory.LazyFunction(lambda: f"tok_{uuid.uuid4().hex[:16]}")
     refresh_token = factory.LazyFunction(lambda: f"ref_{uuid.uuid4().hex[:16]}")
-    expiry = factory.LazyFunction(lambda: (datetime.now(timezone.utc).timestamp()) + 3600)
+    expiry = factory.LazyFunction(
+        lambda: (datetime.now(timezone.utc).timestamp()) + 3600
+    )
 
 
 # ---------------------------------------------------------------------------
 # Review / Stats
 # ---------------------------------------------------------------------------
+
 
 class ReviewHistoryEntryFactory(factory.Factory):
     """A single row from review-history SQL results."""
@@ -136,4 +149,6 @@ class ReviewHistoryEntryFactory(factory.Factory):
     ease = 3
     interval = 30
     time_taken = 8000  # ms
-    review_date = factory.LazyFunction(lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    review_date = factory.LazyFunction(
+        lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    )
