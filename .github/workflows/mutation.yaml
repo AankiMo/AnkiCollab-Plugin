@@ -1,0 +1,80 @@
+# Weekly mutation testing for the AnkiCollab addon's core modules.
+#
+# This systematically mutates real conditionals/operators/comparisons in the
+# core modules and reports which mutations survive (i.e. no test noticed the
+# change).
+#
+# Every surviving mutant should be triaged into:
+#   - equivalent mutation (safe to ignore)
+#   - missing test (write one)
+#   - weak assertion (strengthen the test)
+
+name: Mutation Testing
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # weekly, Monday 03:00 UTC
+  workflow_dispatch: {} # allow manual trigger
+
+jobs:
+  mutate:
+    name: Mutmut (python addon)
+    runs-on: ubuntu-latest
+    env:
+      SKIP_INIT: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies from dist.lock
+        run: |
+          python -m pip install --upgrade pip
+          python -c "
+          import json
+          with open('dist.lock') as f:
+              deps = json.load(f)
+          with open('requirements-locked.txt', 'w') as f:
+              for pkg, version in deps.items():
+                  f.write(f'{pkg}=={version}\n')
+          "
+          pip install -r requirements-locked.txt
+
+      - name: Install test dependencies
+        working-directory: plugin_source
+        run: |
+          pip install \
+            pytest==9.1.1 \
+            pytest-asyncio==1.4.0 \
+            pytest-cov==7.1.0 \
+            requests-mock==1.12.1 \
+            factory-boy==3.3.3 \
+            keyring==25.7.0 \
+            pygtrie==2.5.0 \
+            pyyaml==6.0.3 \
+            mutmut==3.7.0
+
+      - name: Run mutation testing
+        working-directory: plugin_source
+        run: python -m mutmut run
+
+      - name: Summarize mutation results
+        working-directory: plugin_source
+        run: |
+          echo "## Mutation results" >> "$GITHUB_STEP_SUMMARY"
+          python -m mutmut results >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Surviving mutants must be triaged (equivalent / missing test / weak assertion)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload mutmut cache
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutmut-results
+          path: plugin_source/.mutmut-cache
+          if-no-files-found: ignore

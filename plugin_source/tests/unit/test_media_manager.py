@@ -63,7 +63,13 @@ class TestMediaConstants:
     def test_max_file_size(self):
         assert MAX_FILE_SIZE == 10 * 1024 * 1024
 
-    def test_upload_concurrency(self):
+    def test_upload_concurrency(self, tmp_media_dir, mw_mock):
+        """UPLOAD_CONCURRENCY drives the media-upload semaphore size — assert
+        the behavior it controls, not just that the constant is positive."""
+        mm = MediaManager(
+            api_base_url="http://test.local", media_folder=str(tmp_media_dir)
+        )
+        assert mm.upload_semaphore_size == UPLOAD_CONCURRENCY
         assert UPLOAD_CONCURRENCY > 0
 
     def test_allowed_extensions_contain_common_formats(self):

@@ -61,6 +61,25 @@ class TestCalcRetention:
         result = rh.calc_retention(1)
         assert result == 0
 
+    def test_partial_retention_two_thirds(self, rh, mw_mock):
+        # 2 passed, 1 failed → 66 — locks `int(passed * 100 / total)` behavior.
+        # A regression to `int(passed / total) * 100` would silently yield 0
+        # here, which is exactly the kind of bug this mid-range case catches.
+        mw_mock.col.db.first.return_value = (1, 2)
+        assert rh.calc_retention(1) == 66
+
+    def test_partial_retention_one_third(self, rh, mw_mock):
+        # 1 passed, 2 failed → 33
+        mw_mock.col.db.first.return_value = (2, 1)
+        assert rh.calc_retention(1) == 33
+
+    def test_partial_retention_rounds_down_not_up(self, rh, mw_mock):
+        # 1 passed, 1 failed → 50 (exact); 1 passed, 5 failed → 16
+        mw_mock.col.db.first.return_value = (1, 1)
+        assert rh.calc_retention(1) == 50
+        mw_mock.col.db.first.return_value = (5, 1)
+        assert rh.calc_retention(1) == 16
+
 
 class TestGetCardData:
     @pytest.fixture
