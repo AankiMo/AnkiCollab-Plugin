@@ -3,3 +3,12 @@ plugin_source/dist/
 __pycache__/
 plugin_source/meta.json
 .idea/
+.venv/
+.pytest_cache/
+*.pyc
+
+# Coverage / mutation artifacts
+plugin_source/coverage.xml
+htmlcov/
+.mutmut-cache
+plugin_source/.coverage

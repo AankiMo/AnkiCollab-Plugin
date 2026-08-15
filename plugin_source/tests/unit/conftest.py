@@ -29,6 +29,9 @@ _MW_MODULES = [
     "export_manager",
     "media_manager",
     "notifications_center",
+    "menu",
+    "hooks",
+    "sentry_integration",
 ]
 
 

@@ -57,21 +57,94 @@ class FakeCard:
         self.id = id
 
 
+# ---------------------------------------------------------------------------
+# Strict specs for the core Anki interfaces AnkiCollab reads and writes.
+#
+# These exist so that a typo'd or renamed Anki API call (e.g.
+# ``col.decks.get_deck(...)`` instead of ``col.decks.get(...)``) raises
+# ``AttributeError`` instead of silently passing on a permissive MagicMock.
+# The method names below are the *real* names AnkiCollab's production code
+# calls (verified by grepping the codebase); anything not listed here is
+# intentionally unavailable on the fake.
+# ---------------------------------------------------------------------------
+
+
+class _DecksAPI:
+    """Method names AnkiCollab actually calls on ``col.decks``."""
+
+    def get(self, did, default=True): ...
+    def id(self, name): ...
+    def name(self, did): ...
+    def name_if_exists(self, did): ...
+    def all(self): ...
+    def all_names_and_ids(self): ...
+    def children(self, did): ...
+    def parents(self, did): ...
+    def save(self, deck): ...
+    def remove(self, dids): ...
+    def is_filtered(self, did): ...
+    def all_config(self): ...
+    def get_config(self, conf_id): ...
+    def add_config(self, name): ...
+    def update_config(self, cfg): ...
+    def card_count(self, did, include_subdecks=False): ...
+
+
+class _ModelsAPI:
+    """Method names AnkiCollab actually calls on ``col.models``."""
+
+    def get(self, mid): ...
+    def all(self): ...
+    def add(self, model): ...
+    def save(self, model): ...
+    def update_dict(self, model): ...
+    def by_name(self, name): ...
+    def byName(self, name): ...
+    def new(self, name): ...
+    def change_notetype_of_notes(self, request): ...
+
+
+class _DBAPI:
+    """Method names AnkiCollab actually calls on ``col.db``."""
+
+    def all(self, *args, **kwargs): ...
+    def scalar(self, *args, **kwargs): ...
+    def execute(self, *args, **kwargs): ...
+    def list(self, *args, **kwargs): ...
+    def first(self, *args, **kwargs): ...
+
+
+class _TagsAPI:
+    """Method names AnkiCollab actually calls on ``col.tags``."""
+
+    def clear_unused_tags(self): ...
+
+
+class _MediaAPI:
+    """Method names AnkiCollab actually calls on ``col.media``."""
+
+    def dir(self): ...
+    def files_in_str(self, mid, fields): ...
+    def check(self): ...
+
+
 class FakeCol:
     """Minimal stand-in for ``anki.collection.Collection``.
 
-    Wraps a MagicMock so callers can set return values on sub-attributes
-    (``col.decks.get()``, ``col.models.get()``, etc.) while still having
-    sensible defaults.
+    The core Anki interfaces (``decks``, ``models``, ``db``, ``tags``,
+    ``media``) are created with ``spec_set=`` so a typo'd or renamed Anki API
+    call raises ``AttributeError`` instead of silently passing.  Tests can
+    still set ``return_value`` / ``side_effect`` on the real method names.
     """
 
     def __init__(self) -> None:
-        self.models = MagicMock()
-        self.decks = MagicMock()
-        self.tags = MagicMock()
-        self.db = MagicMock()
-        self.media = MagicMock()
+        self.models = MagicMock(spec_set=_ModelsAPI)
+        self.decks = MagicMock(spec_set=_DecksAPI)
+        self.tags = MagicMock(spec_set=_TagsAPI)
+        self.db = MagicMock(spec_set=_DBAPI)
+        self.media = MagicMock(spec_set=_MediaAPI)
         self.media.dir.return_value = ""
+        self.media.files_in_str.return_value = []
         self.conf = {}
 
         # get_note returns a FakeNote by default
@@ -80,7 +153,11 @@ class FakeCol:
         self.find_cards = MagicMock(return_value=[])
         self.remove_notes = MagicMock()
         self.update_note = MagicMock()
+        self.update_notes = MagicMock()
         self.add_note = MagicMock(return_value=1)
+        self.add_notes = MagicMock()
+        self.set_deck = MagicMock()
+        self.sched = MagicMock()
 
     def close(self):
         pass

@@ -8,6 +8,7 @@ on:
 
 jobs:
   lint:
+    name: Lint (python addon)
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -25,21 +26,20 @@ jobs:
         run: black --check --diff plugin_source/
 
   test:
+    name: Test (python addon)
     runs-on: ubuntu-latest
     env:
       SKIP_INIT: "1"
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.9", "3.13"]
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
+          cache: pip
 
       - name: Install dependencies from dist.lock
         run: |
@@ -54,9 +54,46 @@ jobs:
           "
           pip install -r requirements-locked.txt
 
-      - name: Install test-only dependencies
-        run: pip install pytest pytest-asyncio requests-mock
-
-      - name: Run tests
-        run: python -m pytest --import-mode=importlib tests/
+      - name: Install test dependencies
         working-directory: plugin_source
+        run: |
+          pip install \
+            pytest==9.1.1 \
+            pytest-asyncio==1.4.0 \
+            pytest-cov==7.1.0 \
+            requests-mock==1.12.1 \
+            factory-boy==3.3.3 \
+            keyring==25.7.0 \
+            pygtrie==2.5.0 \
+            pyyaml==6.0.3 \
+            mutmut==3.7.0
+
+      - name: Run tests with coverage
+        working-directory: plugin_source
+        run: |
+          python -m pytest --import-mode=importlib \
+            --cov=. \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=30 \
+            tests/
+
+      - name: Check core coverage floors
+        working-directory: plugin_source
+        run: python tests/check_core_coverage_floors.py coverage.xml
+
+      - name: Verify documented test count matches reality
+        working-directory: plugin_source
+        run: |
+          actual="$(python -m pytest tests/ --collect-only -q 2>/dev/null | grep -oP '\d+(?= tests? collected)' | tail -1)"
+          documented="$(grep -oP 'Current test count: \K\d+' tests/TESTING.md | head -1)"
+          echo "actual=$actual documented=$documented"
+          test -n "$actual" && test -n "$documented" && [ "$actual" = "$documented" ]
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pytest-coverage
+          path: plugin_source/coverage.xml
+          if-no-files-found: ignore

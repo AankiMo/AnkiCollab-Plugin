@@ -10,6 +10,8 @@ from export_manager import (
     ALL_COMPILED_MEDIA_REGEXES,
     _is_valid_media_file,
     _filter_valid_filename_mapping,
+    _apply_media_reference_updates,
+    schedule_media_reference_updates,
     _handle_operation_aborted,
     ASYNC_MEDIA_REF_THRESHOLD,
     BATCH_UPDATE_NOTES_SIZE,
@@ -17,16 +19,131 @@ from export_manager import (
 from utils import OperationAbortedError
 
 # ──────────────────────────────────────────────────────────────────────
-# Constants
+# Constants → behavior at the boundaries (not tautological `> 0` checks)
 # ──────────────────────────────────────────────────────────────────────
 
 
-class TestExportConstants:
-    def test_async_media_ref_threshold_positive(self):
-        assert ASYNC_MEDIA_REF_THRESHOLD > 0
+class TestBatchUpdateNotesSize:
+    """BATCH_UPDATE_NOTES_SIZE controls the batch size for mw.col.update_notes.
 
-    def test_batch_update_notes_size_positive(self):
-        assert BATCH_UPDATE_NOTES_SIZE > 0
+    Construct exactly N-1 / N / N+1 notes-to-save and assert the batching loop
+    produces the correct number of batches and batch sizes at each boundary.
+    """
+
+    @pytest.fixture
+    def media_dir(self, tmp_path):
+        d = tmp_path / "media"
+        d.mkdir()
+        (d / "new.mp3").write_bytes(b"x" * 100)  # valid (>= 100 bytes)
+        return d
+
+    def _make_updates(self, n):
+        return [
+            {
+                "note_id": i,
+                "note_guid": f"guid_{i}",
+                "fields": [f"front {i}", "back"],
+                "old_fields": ["front", "back"],
+                "mod": 1234,
+                "old_filenames": ["old.mp3"],
+            }
+            for i in range(n)
+        ]
+
+    def _run(self, mw_mock, n, media_dir):
+        results = {
+            "updates": self._make_updates(n),
+            "filename_mapping": {"old.mp3": "new.mp3"},
+        }
+        mw_mock.col.media.dir.return_value = str(media_dir)
+
+        class _Note:
+            def __init__(self, nid):
+                self.id = nid
+                self.mod = 1234
+                self.fields = ["front", "back"]
+
+        mw_mock.col.get_note.side_effect = lambda nid: _Note(nid)
+        mw_mock.col.update_notes.reset_mock()
+
+        count, _opchanges = _apply_media_reference_updates(results)
+        batch_sizes = [
+            len(call.kwargs["notes"])
+            for call in mw_mock.col.update_notes.call_args_list
+        ]
+        return count, batch_sizes
+
+    def test_one_less_than_batch_size(self, mw_mock, media_dir):
+        count, batch_sizes = self._run(mw_mock, BATCH_UPDATE_NOTES_SIZE - 1, media_dir)
+        assert count == BATCH_UPDATE_NOTES_SIZE - 1
+        assert batch_sizes == [BATCH_UPDATE_NOTES_SIZE - 1]
+
+    def test_exactly_batch_size(self, mw_mock, media_dir):
+        count, batch_sizes = self._run(mw_mock, BATCH_UPDATE_NOTES_SIZE, media_dir)
+        assert count == BATCH_UPDATE_NOTES_SIZE
+        assert batch_sizes == [BATCH_UPDATE_NOTES_SIZE]
+
+    def test_one_more_than_batch_size(self, mw_mock, media_dir):
+        count, batch_sizes = self._run(mw_mock, BATCH_UPDATE_NOTES_SIZE + 1, media_dir)
+        assert count == BATCH_UPDATE_NOTES_SIZE + 1
+        assert batch_sizes == [BATCH_UPDATE_NOTES_SIZE, 1]
+
+    def test_two_batches_exactly(self, mw_mock, media_dir):
+        count, batch_sizes = self._run(mw_mock, 2 * BATCH_UPDATE_NOTES_SIZE, media_dir)
+        assert count == 2 * BATCH_UPDATE_NOTES_SIZE
+        assert batch_sizes == [BATCH_UPDATE_NOTES_SIZE, BATCH_UPDATE_NOTES_SIZE]
+
+
+class TestAsyncMediaRefThreshold:
+    """ASYNC_MEDIA_REF_THRESHOLD decides sync vs async reference updates.
+
+    Just below the threshold the synchronous path must be taken; at and above
+    it the async (QueryOp) path must be taken.
+    """
+
+    def _run(self, mw_mock, n, force_async=False):
+        filename_mapping = {f"old_{i}": f"new_{i}" for i in range(n)}
+        media_files = [(f"old_{i}", f"note_{i}") for i in range(n)]
+        continuation = MagicMock()
+        with (
+            patch(
+                "export_manager.update_media_references", return_value=(n, None)
+            ) as mock_sync,
+            patch("export_manager.QueryOp") as mock_qop,
+        ):
+            schedule_media_reference_updates(
+                None,
+                filename_mapping,
+                media_files,
+                None,
+                continuation,
+                force_async=force_async,
+            )
+        return mock_sync, mock_qop, continuation
+
+    def test_below_threshold_uses_sync_path(self, mw_mock):
+        mock_sync, mock_qop, cont = self._run(mw_mock, ASYNC_MEDIA_REF_THRESHOLD - 1)
+        mock_sync.assert_called_once()
+        mock_qop.assert_not_called()
+        cont.assert_called_once()
+
+    def test_at_threshold_uses_async_path(self, mw_mock):
+        mock_sync, mock_qop, cont = self._run(mw_mock, ASYNC_MEDIA_REF_THRESHOLD)
+        mock_sync.assert_not_called()
+        mock_qop.assert_called_once()
+        cont.assert_not_called()  # runs via QueryOp, which is mocked out
+
+    def test_above_threshold_uses_async_path(self, mw_mock):
+        mock_sync, mock_qop, cont = self._run(mw_mock, ASYNC_MEDIA_REF_THRESHOLD + 1)
+        mock_sync.assert_not_called()
+        mock_qop.assert_called_once()
+        cont.assert_not_called()
+
+    def test_force_async_overrides_small_set(self, mw_mock):
+        mock_sync, mock_qop, cont = self._run(mw_mock, 1, force_async=True)
+        mock_sync.assert_not_called()
+        mock_qop.assert_called_once()
+        cont.assert_not_called()
 
 
 # ──────────────────────────────────────────────────────────────────────

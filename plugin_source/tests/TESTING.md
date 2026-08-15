@@ -4,12 +4,24 @@
 
 ```bash
 # From the addon root (1957538407/)
-python -m pytest tests/            # run all 185 tests
+python -m pytest tests/            # run all tests
 python -m pytest tests/ -x         # stop on first failure
 python -m pytest tests/ -k utils   # run only tests matching "utils"
+python -m pytest tests/integration -m integration   # run only workflow-level tests
 ```
 
-Requires: `pytest`, `pytest-asyncio`, `requests-mock`, `factory-boy` (all in `.venv/`).
+**Current test count: 800** (CI verifies this against `pytest --collect-only`; if you
+add or remove tests, update this number in the same change).
+
+The core data-integrity files (`crowd_anki/representation/deck.py`,
+`crowd_anki/representation/note.py`, `export_manager.py`, `import_manager.py`)
+are also protected by per-file coverage floors enforced by
+`tests/check_core_coverage_floors.py` (run after the coverage step, parsing
+`coverage.xml`). Raise a floor as coverage improves; never lower one without
+an explicit justification in the commit message.
+
+Requires: `pytest`, `pytest-asyncio`, `requests-mock`, `factory-boy`, `pytest-cov`,
+`keyring`, `pygtrie` (all installable via pip).
 
 ---
 
@@ -73,20 +85,45 @@ Provides the autouse `mw_mock` fixture that runs before every test:
 ├── pytest.ini                  # Test configuration
 ├── tests/
 │   ├── __init__.py             # Empty (marks tests as package)
-│   ├── conftest.py             # Shared fixtures (tmp_media_dir, sample_config)
-│   ├── mocks.py                # create_mock_mw(), FakeNote, FakeCard, FakeCol
+│   ├── conftest.py             # Shared fixtures (tmp_media_dir, sample_config, create_mock_collection)
+│   ├── mocks.py                # create_mock_mw(), FakeNote, FakeCard, FakeCol (strict core interfaces)
 │   ├── factories.py            # factory_boy factories for test data
 │   ├── TESTING.md              # This file
+│   ├── test_bootstrap.py       # Bootstrap integrity: broken imports fail collection loudly
+│   ├── test_core_module_coverage.py  # Core-module inventory: no core file with zero test refs
+│   ├── integration/            # Workflow-level tests (marked `integration`)
+│   │   ├── test_export_workflow.py
+│   │   ├── test_import_workflow.py
+│   │   ├── test_export_import_roundtrip.py
+│   │   ├── test_media_reference_update_workflow.py
+│   │   └── test_cancellation_and_failure.py
 │   └── unit/
 │       ├── __init__.py
 │       ├── conftest.py         # Autouse mw_mock fixture (patches all modules)
+│       ├── test_api_client.py
 │       ├── test_auth_manager.py
+│       ├── test_bootstrap_strictness.py  # Meta-test: fake Anki objects reject typos
+│       ├── test_crowd_anki_adapters.py
+│       ├── test_crowd_anki_anki_misc.py
+│       ├── test_crowd_anki_representation_misc.py
+│       ├── test_deck_chunking.py         # CHUNK_SIZE batching boundaries
+│       ├── test_deck_import.py
+│       ├── test_export.py
 │       ├── test_export_manager.py
+│       ├── test_hooks.py
+│       ├── test_http_contracts.py        # Calls real payload builders
 │       ├── test_identifier.py
 │       ├── test_import_manager.py
+│       ├── test_import_safety.py
+│       ├── test_media_glue.py
 │       ├── test_media_manager.py
+│       ├── test_media_optimizer.py
+│       ├── test_menu_logic.py
+│       ├── test_note_import.py
+│       ├── test_note_model.py
+│       ├── test_notifications_center.py
+│       ├── test_sentry_integration.py
 │       ├── test_stats.py
-│       ├── test_thread.py
 │       ├── test_utils.py
 │       └── test_var_defs.py
 ```
@@ -162,11 +199,9 @@ Media upload/download infrastructure:
 - Helpers: `_file_exists_with_size`, `_is_anki_available` (with/without collection),
   `_ensure_executor_available` (shutdown → RuntimeError vs recreation).
 
-### `test_thread.py` (10 tests)
-Thread helpers:
-- `run_function_in_thread()`: execution, arg passing, daemon flag, exception resilience.
-- `run_async_function_in_thread()`: async execution with own event loop.
-- `sync_run_async()`: result forwarding, exception propagation.
+> Note: `test_thread.py` was previously listed here but does not exist.  The
+> thread helpers (`run_function_in_thread`, `sync_run_async`, …) currently have
+> no dedicated test file — a known gap tracked for a future pass.
 
 ---
 
@@ -227,5 +262,35 @@ checks output/behavior. The mock layer only replaces Anki's runtime
   Functions it exports can't be unit tested this way.
 - **`.oga` content type gap**: `.oga` is in `ALLOWED_EXTENSIONS` but missing
   from `CONTENT_TYPE_MAP` — documented in test, not a test bug.
-- **`calc_retention` truncation**: `int(passed / total) * 100` truncates to 0
-  for anything below 100%. Tests are written to match this actual behavior.
+- **Fake Anki collection**: The real Anki API is not importable outside a
+  running Anki instance, so the suite fakes it (see `mocks.py` and
+  `tests/integration/conftest.py`).  The core collection interfaces
+  (`decks`, `models`, `db`, `tags`, `media`) are strict — a typo'd/renamed
+  Anki API call raises `AttributeError` instead of silently passing.
+
+## Harness Integrity (added in the hardening pass)
+
+- **Broken production imports fail collection loudly.**  The root `conftest.py`
+  never installs a `MagicMock` fallback for a production module that fails to
+  import; `tests/test_bootstrap.py` proves it.  Previously three modules were
+  silently mocked (`media_progress_indicator`, `deck_manager`, `media_import`).
+- **`calc_retention` mid-range is locked.**  `int(passed * 100 / total)` is
+  covered at 33/50/66/100/0 and no-data boundaries, so a regression to
+  `int(passed / total) * 100` (which silently zeroes retention below 100%)
+  fails immediately.
+- **Constant assertions test behavior, not `> 0`.**  `BATCH_UPDATE_NOTES_SIZE`,
+  `ASYNC_MEDIA_REF_THRESHOLD`, and `CHUNK_SIZE` are tested at their exact
+  boundary values.
+- **HTTP contract tests call the real payload builders** (e.g.
+  `subscribe_to_deck()`, `_submit_deck_op()`), not hand-built payloads.
+- **Workflow tests** under `tests/integration/` run export, import, round-trip,
+  media-reference, and cancellation/failure through the real orchestration code
+  against a realistic in-memory collection.
+
+## Coverage
+
+Coverage is enforced in CI with a real (measured) baseline: `pytest --cov` with
+`--cov-fail-under=30` (see `.github/workflows/ci.yml`).  The `.coveragerc` scopes
+measurement to the addon's own source (excluding vendored `dist/`, Qt-only `ui/`,
+and `dialogs.py`).  The floor should be raised as coverage of the core modules
+improves.

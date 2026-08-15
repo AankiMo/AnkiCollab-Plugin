@@ -1,0 +1,51 @@
+
+[tool.mutmut]
+# Mutation testing scope — the modules most directly responsible for not
+# silently corrupting a user's collection.  Run weekly via the mutation.yml
+# workflow (see .github/workflows/mutation.yml).
+#
+# NOTE: keys follow the mutmut 3.7 schema.
+#   - `source_paths` (was `paths_to_mutate`) is the FULL list of addon files
+#     that mutmut copies into its `mutants/` working tree.  It must cover
+#     everything the root `conftest.py` imports (top-level modules, ui/,
+#     crowd_anki/), otherwise the harness (fake aqt/anki) cannot start inside
+#     the mutation sandbox and pytest fails at collection.
+#   - `tests_dir` is intentionally omitted: in 3.7 a bare string
+#     (``tests_dir = "tests"``) crashes config loading with
+#     ``TypeError: can only concatenate list (not "str") to list``, and the
+#     runner already selects tests/unit.
+#   - `conftest.py` / `pytest.ini` are copied into the sandbox via `also_copy`
+#     (mutmut does not copy them by default).
+#   - A single-module run is scoped with `only_mutate`, e.g.
+#     `only_mutate = ["export_manager.py"]`.
+source_paths = [
+    "utils.py",
+    "identifier.py",
+    "auth_manager.py",
+    "api_client.py",
+    "var_defs.py",
+    "sentry_integration.py",
+    "thread.py",
+    "media_exporter.py",
+    "media_export.py",
+    "media_import.py",
+    "media_manager.py",
+    "media_progress_indicator.py",
+    "media_optimizer.py",
+    "stats.py",
+    "dialogs.py",
+    "export_manager.py",
+    "import_manager.py",
+    "menu.py",
+    "hooks.py",
+    "gear_menu_setup.py",
+    "notifications_center.py",
+    "ui/",
+    "crowd_anki/",
+]
+also_copy = [
+    "conftest.py",
+    "pytest.ini",
+]
+backup = false
+runner = "python -m pytest tests/unit -x --quiet --tb=short"
