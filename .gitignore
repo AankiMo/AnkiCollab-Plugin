@@ -12,4 +12,3 @@ plugin_source/coverage.xml
 htmlcov/
 .mutmut-cache
 plugin_source/.coverage
-plugin_source/.coveragerc
