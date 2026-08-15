@@ -23,9 +23,11 @@ def mock_keyring():
         if service in fake_keyring and username in fake_keyring[service]:
             del fake_keyring[service][username]
 
-    with patch("keyring.set_password", side_effect=mock_set, create=True), patch(
-        "keyring.get_password", side_effect=mock_get, create=True
-    ), patch("keyring.delete_password", side_effect=mock_delete, create=True):
+    with (
+        patch("keyring.set_password", side_effect=mock_set, create=True),
+        patch("keyring.get_password", side_effect=mock_get, create=True),
+        patch("keyring.delete_password", side_effect=mock_delete, create=True),
+    ):
         yield fake_keyring
 
 

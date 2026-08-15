@@ -317,8 +317,9 @@ class TestBackupBeforeImport:
 
         webresult = [{"deck_hash": "testhash", "deck": {}}]
 
-        with patch("import_manager.install_update"), patch(
-            "import_manager.show_changelog_popup"
+        with (
+            patch("import_manager.install_update"),
+            patch("import_manager.show_changelog_popup"),
         ):
             try:
                 import_webresult((webresult, None, True))
@@ -345,8 +346,9 @@ class TestBackupBeforeImport:
         def track_install(*args, **kwargs):
             call_log.append("install_called")
 
-        with patch("import_manager.install_update", side_effect=track_install), patch(
-            "import_manager.show_changelog_popup", side_effect=track_install
+        with (
+            patch("import_manager.install_update", side_effect=track_install),
+            patch("import_manager.show_changelog_popup", side_effect=track_install),
         ):
             from import_manager import import_webresult
 
