@@ -912,7 +912,6 @@ def _sync_optimize_media_and_update_refs(
     Returns (filename_mapping, files_info, file_paths).
     Database updates are handled later on the main thread.
     """
-    # Check collection availability with graceful abort
     check_collection_or_abort("media_optimization_start")
 
     if not media_files:
@@ -923,19 +922,20 @@ def _sync_optimize_media_and_update_refs(
         f"Starting media optimization for {len(media_files)} files in background task."
     )
 
-    # 1. Run async optimization using the synchronous runner
     def progress_callback(p: float):
-        aqt.mw.taskman.run_on_main(
-            lambda: (
-                aqt.mw.progress.update(
-                    label="Optimizing media for upload",
-                    value=int(p * 100),
-                    max=100,
-                )
-                if aqt.mw.progress.busy()
-                else None
-            )
-        )
+        def _update():
+            try:
+                if aqt.mw.progress.busy():
+                    aqt.mw.progress.update(
+                        label="Optimizing media for upload",
+                        value=int(p * 100),
+                        max=100,
+                    )
+            except RuntimeError:
+                # Bugsink Issue #CLIENT-PYTHON-48
+                pass
+
+        aqt.mw.taskman.run_on_main(_update)
 
     try:
         filename_mapping, files_info, file_paths = _sync_run_async(
@@ -945,18 +945,14 @@ def _sync_optimize_media_and_update_refs(
             f"Background media optimization finished. {len(filename_mapping)} files mapped."
         )
 
-        # Check collection still available after optimization
-        check_collection_or_abort("media_optimization_complete")
     except OperationAbortedError:
         # Re-raise abort errors without wrapping
         raise
     except Exception as e:
         logger.error(f"Error during async media optimization: {str(e)}")
         logger.error(traceback.format_exc())
-        # Propagate error to QueryOp
         raise RuntimeError(f"Media optimization failed: {e}") from e
 
-    # 2. Return results - NO database update here
     return filename_mapping, files_info, file_paths
 
 

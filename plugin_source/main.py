@@ -5,34 +5,55 @@ import platform
 import importlib
 import logging
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "dist"))
-
-# Pillow specific stuff
 base_path = os.path.dirname(__file__)
+dist_path = os.path.join(base_path, "dist")
+
+# Common dependencies.
+sys.path.insert(0, dist_path)
+
 arch = platform.machine()
+
 if sys.version_info[:2] == (3, 9):
     pyver = "py39"
 elif sys.version_info[:2] >= (3, 13):
     pyver = "py313"
 else:
     raise RuntimeError(
-        f"Unsupported Python version for bundled Pillow: {sys.version_info.major}.{sys.version_info.minor}"
+        f"Unsupported Python version: "
+        f"{sys.version_info.major}.{sys.version_info.minor}"
     )
 
 if sys.platform.startswith("win"):
-    sys.path.insert(0, os.path.join(base_path, "dist", "windows", pyver))
+    sys.path.insert(
+        0,
+        os.path.join(base_path, "dist", "windows", pyver),
+    )
+
 elif sys.platform.startswith("linux"):
     if arch == "x86_64":
-        sys.path.insert(0, os.path.join(base_path, "dist", "linux", "x86_64", pyver))
-    elif arch in ("aarch64", "arm64"):  # Some ARM systems report 'arm64'
-        sys.path.insert(0, os.path.join(base_path, "dist", "linux", "aarch64", pyver))
+        sys.path.insert(
+            0,
+            os.path.join(base_path, "dist", "linux", "x86_64", pyver),
+        )
+    elif arch in ("aarch64", "arm64"):
+        sys.path.insert(
+            0,
+            os.path.join(base_path, "dist", "linux", "aarch64", pyver),
+        )
     else:
         raise RuntimeError(f"Unsupported Linux architecture: {arch}")
+
 elif sys.platform.startswith("darwin"):
     if arch == "arm64":
-        sys.path.insert(0, os.path.join(base_path, "dist", "macos", "arm64", pyver))
+        sys.path.insert(
+            0,
+            os.path.join(base_path, "dist", "macos", "arm64", pyver),
+        )
     elif arch == "x86_64":
-        sys.path.insert(0, os.path.join(base_path, "dist", "macos", "x86_64", pyver))
+        sys.path.insert(
+            0,
+            os.path.join(base_path, "dist", "macos", "x86_64", pyver),
+        )
     else:
         raise RuntimeError(f"Unsupported macOS architecture: {arch}")
 

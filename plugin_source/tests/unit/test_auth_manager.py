@@ -9,6 +9,15 @@ from auth_manager import AuthManager
 
 @pytest.fixture(autouse=True)
 def mock_keyring():
+    """Isolate every test from the real system keyring.
+
+    auth_manager binds ``get_password`` / ``set_password`` /
+    ``delete_password`` at module scope (to the real ``keyring`` functions on
+    win/mac, or to config-file fallbacks on Linux). Patching ``keyring.*``
+    would NOT affect those captured references, so tests would hit the real
+    keyring and leak credentials between tests. Patch the module-level aliases
+    auth_manager actually calls instead.
+    """
     fake_keyring = {}
 
     def mock_set(service, username, password):
@@ -24,9 +33,9 @@ def mock_keyring():
             del fake_keyring[service][username]
 
     with (
-        patch("keyring.set_password", side_effect=mock_set, create=True),
-        patch("keyring.get_password", side_effect=mock_get, create=True),
-        patch("keyring.delete_password", side_effect=mock_delete, create=True),
+        patch("auth_manager.set_password", side_effect=mock_set, create=True),
+        patch("auth_manager.get_password", side_effect=mock_get, create=True),
+        patch("auth_manager.delete_password", side_effect=mock_delete, create=True),
     ):
         yield fake_keyring
 
@@ -268,8 +277,8 @@ class TestLogout:
 
 
 class TestKeyringStorage:
-    @patch("keyring.set_password", create=True)
-    @patch("keyring.get_password", create=True)
+    @patch("auth_manager.set_password", create=True)
+    @patch("auth_manager.get_password", create=True)
     def test_keyring_storage(self, mock_get_pw, mock_set_pw, mw_mock):
         """Test that tokens are stored and retrieved via keyring and not plain text."""
         mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: {
@@ -304,7 +313,11 @@ class TestKeyringStorage:
         )
         assert am.get_token() == "secret_token"
 
-    @patch("keyring.set_password", side_effect=Exception("keyring locked"), create=True)
+    @patch(
+        "auth_manager.set_password",
+        side_effect=Exception("keyring locked"),
+        create=True,
+    )
     @patch("auth_manager.aqt.utils.showInfo")
     def test_keyring_fails_aborts(self, mock_showInfo, mock_set_pw, mw_mock):
         mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: {"auth": {}}

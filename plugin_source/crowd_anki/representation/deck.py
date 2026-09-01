@@ -1,5 +1,4 @@
 from collections import namedtuple, defaultdict
-from concurrent.futures import Future
 from typing import Callable, Any, Iterable, List, Dict, Optional
 
 from .deck_config import DeckConfig
@@ -33,11 +32,9 @@ import requests
 import logging
 import time
 import sentry_sdk
-from anki.collection import Collection, EmptyCardsReport
+from anki.collection import Collection
 from aqt.operations import QueryOp
-from aqt.emptycards import EmptyCardsDialog
-from aqt.operations.tag import clear_unused_tags
-from aqt.utils import showInfo, showWarning, tooltip
+from aqt.utils import showWarning, tooltip
 from anki.notes import Note as AnkiNote
 from aqt import mw
 from anki.errors import NotFoundError
@@ -50,20 +47,6 @@ CHUNK_SIZE = 1000
 
 logger = get_logger("ankicollab.deck_import")
 DeckMetadata = namedtuple("DeckMetadata", ["deck_configs", "models"])
-
-
-def silent_clear_empty_cards() -> None:
-    def on_done(fut: Future) -> None:
-        report: EmptyCardsReport = fut.result()
-        if report.notes:
-            dialog = EmptyCardsDialog(aqt.mw, report)
-            dialog._delete_cards(keep_notes=True)
-
-    aqt.mw.taskman.run_in_background(aqt.mw.col.get_empty_cards, on_done)  # type: ignore
-
-
-def silent_clear_unused_tags() -> None:
-    aqt.mw.taskman.run_in_background(aqt.mw.col.tags.clear_unused_tags)  # type: ignore
 
 
 class Deck(JsonSerializableAnkiDict):
@@ -110,6 +93,10 @@ class Deck(JsonSerializableAnkiDict):
 
         # Store field mappings for intelligent note import
         self._field_mappings = {}  # notetype_uuid -> field_mapping
+
+        # Latest import note counts (used for the completion tooltip)
+        self._last_import_notes_new = 0
+        self._last_import_notes_updated = 0
 
     def flatten(self):
         """
@@ -565,44 +552,52 @@ class Deck(JsonSerializableAnkiDict):
                 continue
 
     def on_success(self, count: int, media_result) -> None:
-        # Show cleanup phase at 95%
-        aqt.mw.taskman.run_on_main(
-            lambda: (
-                aqt.mw.progress.update(
-                    label="Finishing...",
-                    value=95,
-                    max=100,
-                )
-                if aqt.mw.progress.busy()
-                else None
-            )
-        )
-
-        silent_clear_unused_tags()
-        silent_clear_empty_cards()
-
-        if self.root_deck_id and not self.keep_empty_subdecks:
-            self.delete_empty_subdecks()
-
-        # Show completion at 100%
-        aqt.mw.taskman.run_on_main(
-            lambda: (
-                aqt.mw.progress.update(
-                    label="Complete",
-                    value=100,
-                    max=100,
-                )
-                if aqt.mw.progress.busy()
-                else None
-            )
-        )
-
-        self.on_media_download_done(media_result)
-
         if mw.progress.busy():
             mw.progress.finish()
-        # Reset window without blocking main thread
-        aqt.mw.reset()
+
+        self._run_post_import_cleanup(media_result)
+
+    @staticmethod
+    def _delete_empty_cards(col) -> None:
+        report = col.get_empty_cards()
+        if not report.notes:
+            return
+        to_delete = []
+        for note in report.notes:
+            if note.will_delete_note:
+                # Keep the first card so the note isn't left orphaned
+                to_delete.extend(note.card_ids[1:])
+            else:
+                to_delete.extend(note.card_ids)
+        if to_delete:
+            col.remove_cards_and_orphaned_notes(to_delete)
+
+    def _run_post_import_cleanup(self, media_result) -> None:
+        def cleanup() -> None:
+            col = aqt.mw.col
+            if col is None:
+                return
+            try:
+                col.tags.clear_unused_tags()
+                self._delete_empty_cards(col)
+                if self.root_deck_id and not self.keep_empty_subdecks:
+                    self.delete_empty_subdecks()
+            except Exception as e:
+                logger.error(f"Post-import cleanup failed: {e}", exc_info=True)
+                try:
+                    sentry_sdk.capture_exception(e)
+                except Exception:
+                    pass
+
+        def on_done(_) -> None:
+            aqt.mw.reset()
+            self.on_media_download_done(media_result)
+
+        op = QueryOp(parent=mw, op=lambda _: cleanup(), success=on_done).failure(
+            on_done
+        )
+        op.with_progress("Finishing...")
+        op.run_in_background()
 
     def create_unified_progress_tracker(self, total_notes):
         class UnifiedProgressTracker:
@@ -687,6 +682,20 @@ class Deck(JsonSerializableAnkiDict):
 
         return UnifiedProgressTracker(total_notes)
 
+    @staticmethod
+    def _format_note_change_summary(notes_new: int, notes_updated: int) -> str:
+        """Build a concise single-line summary of added/updated note counts."""
+        parts = []
+        if notes_new:
+            noun = "note" if notes_new == 1 else "notes"
+            parts.append(f"{notes_new:,} {noun} added")
+        if notes_updated:
+            noun = "note" if notes_updated == 1 else "notes"
+            parts.append(f"{notes_updated:,} {noun} updated")
+        if parts:
+            return ", ".join(parts) + "."
+        return "No notes changed."
+
     def on_media_download_done(self, result=None) -> None:
         if result is None:
             result = {"success": False, "message": "Unknown error"}
@@ -698,18 +707,13 @@ class Deck(JsonSerializableAnkiDict):
         # mw.col.media.check()
 
         if result["success"]:
-            downloaded = result.get("downloaded", 0)
-            skipped = result.get("skipped", 0)
-            total = downloaded + skipped
+            # Prefer counts carried in the result; fall back to the counts
+            # recorded on this deck instance during bulk processing.
+            notes_new = result.get("notes_new", self._last_import_notes_new)
+            notes_updated = result.get("notes_updated", self._last_import_notes_updated)
+            msg = self._format_note_change_summary(notes_new, notes_updated)
 
-            if downloaded > 0:
-                msg = f"Deck imported successfully.\n{downloaded:,} media files downloaded, {skipped:,} already present."
-            elif total > 0:
-                msg = f"Deck imported successfully.\nAll {total:,} media files were already present."
-            else:
-                msg = "Deck imported successfully.\nNo media files needed."
-
-            aqt.utils.tooltip(msg, parent=mw, period=4000)  # type: ignore
+            aqt.utils.tooltip(msg, parent=mw, period=2500)  # type: ignore
         else:
             error_msg = result.get("message", "Unknown error")
             aqt.utils.showWarning(  # type: ignore
@@ -1552,7 +1556,11 @@ class Deck(JsonSerializableAnkiDict):
             progress_tracker.set_phase_label("Processing notes...")
             logger.info("Starting bulk processing of notes...")
             status_cur, temp_deck_id, temp_deck_name = self._bulk_process_all_notes(
-                collection, all_notes, import_config, progress_tracker, note_to_deck_map
+                collection,
+                all_notes,
+                import_config,
+                progress_tracker,
+                note_to_deck_map,
             )
             notes_in_temp_deck = status_cur
 
@@ -1656,7 +1664,11 @@ class Deck(JsonSerializableAnkiDict):
                         "skipped": len(media_files),
                     }
             else:
-                media_result = {"success": True, "downloaded": 0, "skipped": 0}
+                media_result = {
+                    "success": True,
+                    "downloaded": 0,
+                    "skipped": 0,
+                }
 
             logger.info(
                 f"Bulk import completed successfully: {status_cur} notes imported"
@@ -1796,9 +1808,6 @@ class Deck(JsonSerializableAnkiDict):
         self, collection, all_notes, import_config, progress_tracker, note_to_deck_map
     ):
         """Process all notes in bulk with optimized database operations"""
-        if not all_notes:
-            return 0
-
         int_time = anki.utils.int_time()
         total_notes = len(all_notes)
 
@@ -1844,7 +1853,7 @@ class Deck(JsonSerializableAnkiDict):
         # Ensure metadata exists
         if not self.metadata:
             logger.error("No metadata available for processing notes")
-            return 0
+            return 0, None, None
 
         # Single iteration to do everything at once
         for note in all_notes:
@@ -1963,6 +1972,9 @@ class Deck(JsonSerializableAnkiDict):
                 ):
                     progress_tracker.update_notes_progress(processed_count)
                     if mw.progress.want_cancel():
+                        # Record partial note counts for the completion tooltip
+                        self._last_import_notes_new = len(all_new_notes)
+                        self._last_import_notes_updated = len(all_update_notes)
                         # Return temp deck info for cleanup
                         return processed_count, self.root_deck_id, temp_deck_name
 
@@ -1990,6 +2002,10 @@ class Deck(JsonSerializableAnkiDict):
             except Exception as sentry_error:
                 logger.error(f"Failed to report to Sentry: {sentry_error}")
             raise
+
+        # Record note counts for the completion tooltip
+        self._last_import_notes_new = len(all_new_notes)
+        self._last_import_notes_updated = len(all_update_notes)
 
         # Return temp deck info along with count for cleanup
         return processed_count, self.root_deck_id, temp_deck_name

@@ -1,4 +1,5 @@
 import sys
+import webbrowser
 from aqt import gui_hooks, mw
 from aqt.browser import Browser, SidebarTreeView, SidebarItem, SidebarItemType
 from anki.decks import DeckId
@@ -540,11 +541,40 @@ def _get_linked_base_hashes(subscriber_hash: str) -> List[str]:
         return []
 
 
+def _open_note_on_ankicollab(note_id: NoteId, editor=None) -> None:
+    note = mw.col.get_note(note_id)
+    if not note or not note.cards():
+        showInfo(
+            "Could not find the note or its cards.",
+            parent=editor.parentWindow if editor and editor.parentWindow else mw,
+        )
+        return
+    note_guid = get_note_guid_from_id(note_id)
+    card = note.cards()[0]
+    deck_hash, error = get_deck_hash_from_card(card)
+
+    if deck_hash is None:
+        aqt.utils.showInfo(
+            error or "Cannot find the Cloud Deck for these notes.",
+            parent=editor.parentWindow if editor and editor.parentWindow else mw,
+        )
+        return
+
+    payload = {
+        "deck_hash": deck_hash,
+        "guid": note_guid,
+    }
+
+    from .api_client import api_client
+
+    response = api_client.post_json("/ResolveNoteReview", payload, timeout=30)
+    response.raise_for_status()
+
+    target_url = response.json()["url"]
+    webbrowser.open(target_url)
+
+
 def init_editor_card(buttons: List[str], editor):
-    # This hook adds a button PERMANENTLY to the editor instance.
-    # We need to check login status *at the time the editor opens*.
-    # If the user logs in *while* the editor is open, this button won't appear
-    # until a new editor window is opened. This is usually acceptable.
     if not auth_manager.is_logged_in():
         return buttons
 
@@ -554,15 +584,28 @@ def init_editor_card(buttons: List[str], editor):
 
     b = editor.addButton(
         icon=None,
-        cmd="AnkiCollab",
+        cmd="AnkiCollab_Suggestion",
         func=lambda editor=editor: suggest_notes([editor.note.id], 2, editor=editor),
-        tip="Suggest changes to the cloud deck",
-        label="AnkiCollab",
+        tip="AnkiCollab: Suggest changes for this note",
+        label="AC: Suggest changes",
+        keys=None,
+        disables=False,
+    )
+
+    b2 = editor.addButton(
+        icon=None,
+        cmd="AnkiCollab_OpenNote",
+        func=lambda editor=editor: _open_note_on_ankicollab(
+            editor.note.id, editor=editor
+        ),
+        tip="AnkiCollab: Open this note on the website",
+        label="AC: ↗ Open",
         keys=None,
         disables=False,
     )
 
     buttons.append(b)
+    buttons.append(b2)
     return buttons
 
 

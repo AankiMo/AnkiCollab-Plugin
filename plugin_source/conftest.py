@@ -55,7 +55,6 @@ _FAKE_MODULES = [
     "anki.cards",
     "anki.utils",
     "anki.sound",
-    "anki.exporting",
     "sentry_sdk",
 ]
 
@@ -176,6 +175,12 @@ class _StubQThread:
 
 class _StubQDialog:
     """Minimal stub for QDialog."""
+
+    # Mirrors real Qt: ``QDialog.DialogCode.Accepted`` / ``Rejected`` used by
+    # dialog exec() callers across the addon (e.g. _ask_share_stats).
+    from types import SimpleNamespace as _SimpleNamespace
+
+    DialogCode = _SimpleNamespace(Accepted=1, Rejected=0)
 
     def __init__(self, *a, **kw):
         pass

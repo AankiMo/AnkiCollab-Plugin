@@ -147,7 +147,8 @@
     html.push(renderDecisionBanner(snapshot));
 
     var events = snapshot.events || [];
-    if (events.length === 0) {
+    var deniedNotes = snapshot.denied_notes || [];
+    if (events.length === 0 && deniedNotes.length === 0) {
       html.push('<div class="snapshot-empty">No immutable note events were found for this commit.</div>');
     } else {
       var grouped = groupByNote(events);
@@ -197,6 +198,10 @@
 
         html.push('</div>');
         html.push('</details>');
+      });
+
+      deniedNotes.forEach(function (note, index) {
+        html.push(renderDeniedNote(note, index));
       });
     }
     html.push('</div>');
@@ -448,6 +453,36 @@
       return renderMoveEvent(event);
     }
     return renderFieldEvent(event);
+  }
+
+  function renderDeniedNote(note, index) {
+    var html = '';
+    html += '<details class="note-section" open>';
+    html += '<summary class="note-divider"><span class="note-divider-title">Rejected New Note ' + String(index + 1) + '</span></summary>';
+    html += '<div class="note-content">';
+
+    (note.fields || []).forEach(function (field) {
+      html += '<div class="event-card">';
+      html += '<div class="event-head"><span class="event-field">' + escapeHtml(field.name || ('Field ' + String(field.position))) + '</span></div>';
+      html += '<div class="event-columns split-diff">';
+      html += '<div class="event-col old-side"><div class="event-col-title">Suggested</div><div class="event-col-body rich-content">' + fieldHtml(field.content, 'No content') + '</div></div>';
+      html += '</div>';
+      html += '</div>';
+    });
+
+    if ((note.tags || []).length > 0) {
+      html += '<div class="event-card">';
+      html += '<div class="tag-chip-wrap">';
+      (note.tags || []).forEach(function (tag) {
+        html += '<span class="tag-pill tag-added">' + escapeHtml(normalizeTagLabel(tag)) + '</span>';
+      });
+      html += '</div>';
+      html += '</div>';
+    }
+
+    html += '</div>';
+    html += '</details>';
+    return html;
   }
 
   function buildEmptyState(iconChar, title, subtextLines) {

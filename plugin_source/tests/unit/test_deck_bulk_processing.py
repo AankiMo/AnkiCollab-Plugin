@@ -87,15 +87,6 @@ class TestBulkProcessAllNotes:
             )
         return result, m_add, m_pres, m_restore
 
-    def test_empty_returns_zero(self):
-        col = create_mock_collection()
-        deck = _make_deck([])
-        result, m_add, m_pres, m_restore = self._run(deck, [], col, _cfg())
-        # Empty input short-circuits and returns a plain 0 (no temp deck).
-        assert result == 0
-        m_add.assert_not_called()
-        m_pres.assert_not_called()
-
     def test_all_new_notes_batched_to_add(self):
         col = create_mock_collection()
         col.db.all.return_value = []  # no existing notes

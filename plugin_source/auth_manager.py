@@ -14,25 +14,61 @@ from .var_defs import API_BASE_URL
 KEYRING_SERVICE = "AnkiCollab"
 
 
+# On Windows/macOS use the system keyring for token storage. On Linux the
+# keyring package is not shipped with the addon, so store secrets in the
+# addon config file instead.
+def _config_get_password(service, username):
+    """Read a stored secret from the addon config file (Linux fallback)."""
+    config = mw.addonManager.getConfig(__name__) or {}
+    return config.get("auth", {}).get(username)
+
+
+def _config_set_password(service, username, password):
+    """Persist a secret in the addon config file (Linux fallback)."""
+    config = mw.addonManager.getConfig(__name__) or {}
+    config.setdefault("auth", {})[username] = password
+    mw.addonManager.writeConfig(__name__, config)
+
+
+def _config_delete_password(service, username):
+    """Remove a secret from the addon config file (Linux fallback)."""
+    config = mw.addonManager.getConfig(__name__) or {}
+    secrets = config.get("auth", {})
+    if username in secrets:
+        del secrets[username]
+        mw.addonManager.writeConfig(__name__, config)
+
+
+if sys.platform in ("win32", "darwin"):
+    try:
+        import keyring
+
+        get_password = keyring.get_password
+        set_password = keyring.set_password
+        delete_password = keyring.delete_password
+    except ImportError:
+        logging.getLogger(__name__).warning(
+            "keyring not available on %s, falling back to config storage",
+            sys.platform,
+        )
+        get_password = _config_get_password
+        set_password = _config_set_password
+        delete_password = _config_delete_password
+else:
+    # Linux (or other platforms): keyring is not shipped, use config storage.
+    get_password = _config_get_password
+    set_password = _config_set_password
+    delete_password = _config_delete_password
+
+
 class AuthManager:
     def __init__(self):
         self.config_key = __name__
-        self._keyring_available = True
-        self._keyring_warned = False
         self.auth_data = {}
 
         from aqt import gui_hooks
 
         gui_hooks.main_window_did_init.append(self._load_auth_data)
-
-    def _warn_keyring_fallback_once(self, reason):
-        if self._keyring_warned:
-            return
-        self._keyring_warned = True
-        logging.getLogger(__name__).warning(
-            "Keyring unavailable, falling back to config storage: %s",
-            reason,
-        )
 
     def _write_auth_config(self, auth_payload):
         strings_data = mw.addonManager.getConfig(self.config_key) or {}
@@ -40,66 +76,53 @@ class AuthManager:
         mw.addonManager.writeConfig(self.config_key, strings_data)
 
     def _load_auth_data(self):
-        """Load authentication data from Anki config and keyring"""
+        """Load authentication data from Anki config and credential storage"""
         self.auth_data = {}
         strings_data = mw.addonManager.getConfig(self.config_key)
         if strings_data and "auth" in strings_data:
             self.auth_data = strings_data["auth"]
 
-        if not self._keyring_available:
-            return
-
         try:
-            import keyring
-
-            token = keyring.get_password(KEYRING_SERVICE, "token")
+            token = get_password(KEYRING_SERVICE, "token")
             if token is not None:
                 self.auth_data["token"] = token
 
-            refresh_token = keyring.get_password(KEYRING_SERVICE, "refresh_token")
+            refresh_token = get_password(KEYRING_SERVICE, "refresh_token")
             if refresh_token is not None:
                 self.auth_data["refresh_token"] = refresh_token
         except Exception as e:
-            self._keyring_available = False
-            self._warn_keyring_fallback_once(e)
+            logging.getLogger(__name__).warning(
+                "Failed to load credentials from secure storage: %s", e
+            )
 
     def _save_auth_data(self):
-        """Save authentication data to Anki config and keyring"""
+        """Save authentication data to Anki config and credential storage"""
         config_auth = self.auth_data.copy()
         token = config_auth.pop("token", None)
         refresh_token = config_auth.pop("refresh_token", None)
 
-        if not self._keyring_available:
-            if token is not None:
-                config_auth["token"] = token
-            if refresh_token is not None:
-                config_auth["refresh_token"] = refresh_token
-            self._write_auth_config(config_auth)
-            return
-
         self._write_auth_config(config_auth)
 
         try:
-            import keyring
-
             if token is not None:
-                keyring.set_password(KEYRING_SERVICE, "token", token)
+                set_password(KEYRING_SERVICE, "token", token)
             else:
                 try:
-                    keyring.delete_password(KEYRING_SERVICE, "token")
+                    delete_password(KEYRING_SERVICE, "token")
                 except Exception:
                     pass
 
             if refresh_token is not None:
-                keyring.set_password(KEYRING_SERVICE, "refresh_token", refresh_token)
+                set_password(KEYRING_SERVICE, "refresh_token", refresh_token)
             else:
                 try:
-                    keyring.delete_password(KEYRING_SERVICE, "refresh_token")
+                    delete_password(KEYRING_SERVICE, "refresh_token")
                 except Exception:
                     pass
         except Exception as e:
-            self._keyring_available = False
-            self._warn_keyring_fallback_once(e)
+            logging.getLogger(__name__).warning(
+                "Failed to save credentials to secure storage: %s", e
+            )
             aqt.utils.showInfo(
                 "Secure token storage is unavailable. Please unlock keyring storage and try again."
             )
