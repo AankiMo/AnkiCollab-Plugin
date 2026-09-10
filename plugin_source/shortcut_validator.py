@@ -173,7 +173,7 @@ def _extract_first_combination(seq: QKeySequence) -> str:
 
 
 def _modifier_count(combo: str) -> int:
-    modifiers = {"Ctrl", "Alt", "Shift", "Meta"}
+    modifiers = {"Ctrl", "Alt", "Shift", "Meta", "Fn"}
     parts = [p.strip() for p in combo.split("+") if p.strip()]
     return sum(1 for p in parts if p in modifiers)
 
