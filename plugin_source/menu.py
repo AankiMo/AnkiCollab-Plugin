@@ -1,6 +1,7 @@
 from aqt import mw
 from aqt.utils import askUser, showInfo
 from aqt.qt import *
+
 # Explicit imports to satisfy static analyzers (aqt.qt re-exports Qt classes)
 from aqt.qt import (
     QMenu,
@@ -44,41 +45,58 @@ from .notifications_center import (
     set_notification_visibility,
 )
 from .sentry_integration import init_sentry
-from .ui.colors import get_colors, get_button_style, get_dialog_style, get_input_style, get_table_style, get_groupbox_style, get_combobox_style, get_info_box_style
+from .ui.colors import (
+    get_colors,
+    get_button_style,
+    get_dialog_style,
+    get_input_style,
+    get_table_style,
+    get_groupbox_style,
+    get_combobox_style,
+    get_info_box_style,
+)
 from anki.utils import point_version
 
-collab_menu = QMenu('AnkiCollab', mw)
-links_menu = QMenu('Links', mw)
+collab_menu = QMenu("AnkiCollab", mw)
+links_menu = QMenu("Links", mw)
 
 # Main Actions
-edit_list_action = QAction('Manage Subscriptions', mw)
-push_deck_action = QAction('Publish New Deck', mw)
-pull_changes_action = QAction('Update Decks', mw)
-pull_changes_action.setToolTip("Download updates from AnkiCollab (does NOT upload your changes)")
-general_settings_action = QAction('Settings', mw)
-general_settings_action.setMenuRole(QAction.MenuRole.NoRole) # I hate apple
+edit_list_action = QAction("Manage Subscriptions", mw)
+push_deck_action = QAction("Publish New Deck", mw)
+pull_changes_action = QAction("Update Decks", mw)
+pull_changes_action.setToolTip(
+    "Download updates from AnkiCollab (does NOT upload your changes)"
+)
+general_settings_action = QAction("Settings", mw)
+general_settings_action.setMenuRole(QAction.MenuRole.NoRole)  # I hate apple
 general_settings_action.setToolTip("Configure AnkiCollab settings and sync settings")
-login_manager_action = QAction('Login', mw) # Default text is Login
+login_manager_action = QAction("Login", mw)  # Default text is Login
 
 # Links Actions
-community_action = QAction('Join Community (Discord)', mw)
-website_action = QAction('Visit Website', mw)
-donation_action = QAction('Rate this Add-on', mw)
+community_action = QAction("Join Community (Discord)", mw)
+website_action = QAction("Visit Website", mw)
+donation_action = QAction("Rate this Add-on", mw)
 
-def force_logout(with_dialog = True):
+
+def force_logout(with_dialog=True):
     auth_manager.logout()
-    update_ui_for_login_state() # Update UI after logout
+    update_ui_for_login_state()  # Update UI after logout
     if with_dialog:
         showInfo("Your login expired. Please log in again.")
     mw.reset()
 
+
 def delete_selected_rows(table, dialog):
     if table.selectedIndexes() == []:
-        showInfo("No subscription selected.\n\nClick on a row in the table to select it first.")
+        showInfo(
+            "No subscription selected.\n\nClick on a row in the table to select it first."
+        )
         return
     dialog.accept()
     strings_data = mw.addonManager.getConfig(__name__)
-    selected_rows = sorted(set(index.row() for index in table.selectedIndexes()), reverse=True)
+    selected_rows = sorted(
+        set(index.row() for index in table.selectedIndexes()), reverse=True
+    )
     if not strings_data:
         strings_data = {}
     for row in selected_rows:
@@ -88,106 +106,116 @@ def delete_selected_rows(table, dialog):
             op = QueryOp(
                 parent=mw,
                 op=lambda col: unsubscribe_from_deck(deck_hash),
-                success=lambda result: None
+                success=lambda result: None,
             )
             if point_version() >= 231000:
                 op = op.without_collection()
             op.run_in_background()
-            
+
             if deck_hash in strings_data:
                 logger.debug(f"Unsubscribing from deck: {deck_hash}")
                 strings_data.pop(deck_hash)
         table.removeRow(row)
     mw.addonManager.writeConfig(__name__, strings_data)
-    on_edit_list() # This will create a fresh DeckManager() and table
+    on_edit_list()  # This will create a fresh DeckManager() and table
 
 
 def validate_deck_hash(deck_hash: str) -> bool:
     if not deck_hash:
         return False
-    
-    parts = deck_hash.split('-')
-    
+
+    parts = deck_hash.split("-")
+
     # Validate deck hash format: 3, 5, or 6 words (legacy and standard formats)
     if len(parts) not in (3, 5, 6):
         return False
-    
+
     # Each part must be alphabetic only (lowercase for standard, mixed case for legacy)
     if not all(part and part.isalpha() for part in parts):
         return False
-    
+
     return True
 
 
 def add_to_table(line_edit, table, dialog):
-    
-    string = line_edit.text().strip() # just to prevent issues for copy paste errors
+
+    string = line_edit.text().strip()  # just to prevent issues for copy paste errors
     if not validate_deck_hash(string):
-        showInfo("That deck subscription key doesn’t look right. Please double-check it.")
+        showInfo(
+            "That deck subscription key doesn’t look right. Please double-check it."
+        )
         return
-        
+
     if not askUser(
-            (
-                "Proceeding will download and install a file from the internet that is potentially malicious!<br>"
-                "We are not able to check every upload, so only download and install Decks that you know and trust!<br><br>"
-                "Continue with download?"
-            ),
-            title="AnkiCollab",
-        ):
+        (
+            "Proceeding will download and install a file from the internet that is potentially malicious!<br>"
+            "We are not able to check every upload, so only download and install Decks that you know and trust!<br><br>"
+            "Continue with download?"
+        ),
+        title="AnkiCollab",
+    ):
         return
     strings_data = mw.addonManager.getConfig(__name__)
-    if strings_data is None: strings_data = {} # Initialize if None
+    if strings_data is None:
+        strings_data = {}  # Initialize if None
     if string:
         # Check if already subscribed
         if string in strings_data:
-            showInfo(f"You're already subscribed to this deck.\n\nUse 'Update Decks' to get the latest changes.")
-            line_edit.setText('')
+            showInfo(
+                f"You're already subscribed to this deck.\n\nUse 'Update Decks' to get the latest changes."
+            )
+            line_edit.setText("")
             return
-                
+
         strings_data[string] = {
-            'timestamp': '2022-12-31 23:59:59',
-            'deckId': 0,
-            'optional_tags': {},
-            'personal_tags': DEFAULT_PROTECTED_TAGS,
+            "timestamp": "2022-12-31 23:59:59",
+            "deckId": 0,
+            "optional_tags": {},
+            "personal_tags": DEFAULT_PROTECTED_TAGS,
         }
         mw.addonManager.writeConfig(__name__, strings_data)
-        line_edit.setText('')
+        line_edit.setText("")
         num_rows = table.rowCount()
         table.insertRow(num_rows)
         table.setItem(num_rows, 0, QTableWidgetItem(string))
         dialog.accept()
         subscribe_to_deck(string)
         handle_pull(string)
-        #on_edit_list() # we could reopen the dialog with updated data
+        # on_edit_list() # we could reopen the dialog with updated data
+
 
 def update_local_deck(input_hash, new_deck, popup_dialog, subs_dialog):
     strings_data = mw.addonManager.getConfig(__name__)
-    deck_id = mw.col.decks.id(new_deck) # Get deck ID
+    deck_id = mw.col.decks.id(new_deck)  # Get deck ID
     if strings_data and input_hash in strings_data:
         strings_data[input_hash]["deckId"] = deck_id
         mw.addonManager.writeConfig(__name__, strings_data)
         popup_dialog.accept()
         subs_dialog.accept()
-        on_edit_list() # Reopen with updated data
+        on_edit_list()  # Reopen with updated data
     else:
-        showInfo(f"Error updating local deck for hash: {input_hash}. Configuration not found.")
+        showInfo(
+            f"Error updating local deck for hash: {input_hash}. Configuration not found."
+        )
         popup_dialog.accept()
 
 
 def on_edit_list():
     colors = get_colors()
-    
+
     dialog = QDialog(mw)
-    dialog.setWindowTitle('AnkiCollab - Manage Subscriptions')
+    dialog.setWindowTitle("AnkiCollab - Manage Subscriptions")
     dialog.setMinimumSize(800, 500)
     dialog.setStyleSheet(get_dialog_style())
-    
+
     layout = QVBoxLayout()
     dialog.setLayout(layout)
 
     # Header
     header_label = QLabel("Manage Your Subscriptions")
-    header_label.setStyleSheet(f"font-size: 16px; font-weight: 500; margin: 10px 0; color: {colors['text_primary']};")
+    header_label.setStyleSheet(
+        f"font-size: 16px; font-weight: 500; margin: 10px 0; color: {colors['text_primary']};"
+    )
     header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(header_label)
 
@@ -196,18 +224,26 @@ def on_edit_list():
     strings_data = mw.addonManager.getConfig(__name__)
 
     # Filter out settings/auth keys before counting rows
-    filtered_keys = [k for k in strings_data if k not in ["settings", "auth"]] if strings_data else []
+    filtered_keys = (
+        [k for k in strings_data if k not in ["settings", "auth"]]
+        if strings_data
+        else []
+    )
     table.setRowCount(len(filtered_keys))
     table.setColumnCount(5)
-    table.setHorizontalHeaderLabels(['Subscription Key', 'Local Deck', 'New Notes Deck', 'Last Updated', 'Actions'])
-    
+    table.setHorizontalHeaderLabels(
+        ["Subscription Key", "Local Deck", "New Notes Deck", "Last Updated", "Actions"]
+    )
+
     # Style the table
     table.setAlternatingRowColors(True)
     table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
     table.verticalHeader().setVisible(False)
-    table.verticalHeader().setDefaultSectionSize(36)  # Default row height that works across DPI
+    table.verticalHeader().setDefaultSectionSize(
+        36
+    )  # Default row height that works across DPI
     table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-    
+
     header = table.horizontalHeader()
     header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
     header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -232,7 +268,10 @@ def on_edit_list():
         new_notes_deck_id = details.get("new_notes_home_deck", None)
         if new_notes_deck_id and mw.col:
             try:
-                new_notes_deck_name = mw.col.decks.name_if_exists(new_notes_deck_id) or "Same as Local Deck"
+                new_notes_deck_name = (
+                    mw.col.decks.name_if_exists(new_notes_deck_id)
+                    or "Same as Local Deck"
+                )
             except (KeyError, AttributeError, TypeError):
                 # Deck may have been deleted or collection unavailable
                 new_notes_deck_name = "Same as Local Deck"
@@ -253,7 +292,7 @@ def on_edit_list():
         actions_layout = QHBoxLayout(actions_widget)
         actions_layout.setContentsMargins(2, 0, 2, 0)
         actions_layout.setSpacing(0)
-        
+
         edit_button = QPushButton("···")
         edit_button.setToolTip("Configure deck location and sync settings")
         edit_button.setStyleSheet(f"""
@@ -273,56 +312,64 @@ def on_edit_list():
             }}
         """)
         edit_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        edit_button.clicked.connect(lambda checked, h=deck_hash, d=dialog: edit_subscription_details(h, d))
+        edit_button.clicked.connect(
+            lambda checked, h=deck_hash, d=dialog: edit_subscription_details(h, d)
+        )
         actions_layout.addWidget(edit_button)
-        
+
         table.setCellWidget(row, 4, actions_widget)
 
         row += 1
 
     layout.addWidget(table)
 
-    # Add new subscription section    
+    # Add new subscription section
     add_section = QGroupBox("Add New Subscription")
     add_section.setStyleSheet(get_groupbox_style())
     add_layout = QVBoxLayout(add_section)
     add_layout.setContentsMargins(10, 10, 10, 10)
-    
+
     add_input_layout = QHBoxLayout()
     line_edit = QLineEdit()
-    line_edit.setPlaceholderText("Enter subscription key (e.g. word-word-word-word-word)")
+    line_edit.setPlaceholderText(
+        "Enter subscription key (e.g. word-word-word-word-word)"
+    )
     line_edit.setStyleSheet(get_input_style())
-    add_button = QPushButton('Add Subscription')
-    add_button.setStyleSheet(get_button_style('primary'))
+    add_button = QPushButton("Add Subscription")
+    add_button.setStyleSheet(get_button_style("primary"))
     add_button.clicked.connect(lambda: add_to_table(line_edit, table, dialog))
     add_input_layout.addWidget(line_edit)
     add_input_layout.addWidget(add_button)
     add_layout.addLayout(add_input_layout)
 
-    disclaimer = QLabel("Note: Adding a subscription may take a moment. Anki might freeze briefly during the initial download.")
+    disclaimer = QLabel(
+        "Note: Adding a subscription may take a moment. Anki might freeze briefly during the initial download."
+    )
     disclaimer.setWordWrap(True)
-    disclaimer.setStyleSheet(f"color: {colors['text_secondary']}; font-style: italic; margin: 5px 0;")
+    disclaimer.setStyleSheet(
+        f"color: {colors['text_secondary']}; font-style: italic; margin: 5px 0;"
+    )
     add_layout.addWidget(disclaimer)
-    
+
     layout.addWidget(add_section)
 
     # Bottom buttons
     button_layout = QHBoxLayout()
-    
-    delete_button = QPushButton('Delete Selected')
-    delete_button.setStyleSheet(get_button_style('danger'))
+
+    delete_button = QPushButton("Delete Selected")
+    delete_button.setStyleSheet(get_button_style("danger"))
     delete_button.clicked.connect(lambda: delete_selected_rows(table, dialog))
     button_layout.addWidget(delete_button)
-    
-    settings_button = QPushButton('Global Settings')
-    settings_button.setStyleSheet(get_button_style('neutral'))
+
+    settings_button = QPushButton("Global Settings")
+    settings_button.setStyleSheet(get_button_style("neutral"))
     settings_button.clicked.connect(lambda: show_global_settings_dialog(dialog))
     button_layout.addWidget(settings_button)
-    
+
     button_layout.addStretch()
-    
-    close_button = QPushButton('Close')
-    close_button.setStyleSheet(get_button_style('neutral'))
+
+    close_button = QPushButton("Close")
+    close_button.setStyleSheet(get_button_style("neutral"))
     close_button.clicked.connect(dialog.accept)
     button_layout.addWidget(close_button)
 
@@ -334,19 +381,19 @@ def on_edit_list():
 def edit_subscription_details(deck_hash, parent_dialog):
     """Edit detailed settings for a specific subscription"""
     colors = get_colors()
-    
+
     strings_data = mw.addonManager.getConfig(__name__)
     if not strings_data or deck_hash not in strings_data:
         showInfo("Subscription not found!")
         return
 
     details = strings_data[deck_hash]
-    
+
     dialog = QDialog(parent_dialog)
-    dialog.setWindowTitle('Subscription Settings')
+    dialog.setWindowTitle("Subscription Settings")
     dialog.setMinimumWidth(400)
     dialog.setStyleSheet(get_dialog_style())
-    
+
     layout = QVBoxLayout()
     dialog.setLayout(layout)
 
@@ -358,15 +405,19 @@ def edit_subscription_details(deck_hash, parent_dialog):
 
     # Header
     header_label = QLabel("Subscription Settings")
-    header_label.setStyleSheet(f"font-size: 14px; font-weight: 500; margin: 10px 0; color: {colors['text_primary']};")
+    header_label.setStyleSheet(
+        f"font-size: 14px; font-weight: 500; margin: 10px 0; color: {colors['text_primary']};"
+    )
     header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(header_label)
 
     # Subscription Key - larger, monospace, and selectable/copyable
     key_label = QLabel("Subscription Key")
-    key_label.setStyleSheet(f"font-size: 11px; color: {colors['text_secondary']}; margin-top: 5px;")
+    key_label.setStyleSheet(
+        f"font-size: 11px; color: {colors['text_secondary']}; margin-top: 5px;"
+    )
     layout.addWidget(key_label)
-    
+
     key_field = QLineEdit(deck_hash)
     key_field.setReadOnly(True)
     key_field.setStyleSheet(f"""
@@ -390,12 +441,12 @@ def edit_subscription_details(deck_hash, parent_dialog):
     # Local Deck Selection
     local_deck_group = QGroupBox("Local Deck (for existing notes)")
     local_deck_layout = QVBoxLayout(local_deck_group)
-    
+
     local_deck_combo = QComboBox()
     decks = mw.col.decks.all_names_and_ids(skip_empty_default=True)
     deck_names = sorted([d.name for d in decks])
     local_deck_combo.addItems(deck_names)
-    
+
     # Pre-select current deck
     current_deck_id = details.get("deckId", 0)
     if current_deck_id and mw.col:
@@ -406,7 +457,7 @@ def edit_subscription_details(deck_hash, parent_dialog):
         except (KeyError, AttributeError, TypeError):
             # Deck may have been deleted or collection unavailable - leave combo at default
             pass
-    
+
     local_deck_layout.addWidget(QLabel("Choose where existing notes will be placed:"))
     local_deck_layout.addWidget(local_deck_combo)
     layout.addWidget(local_deck_group)
@@ -414,23 +465,28 @@ def edit_subscription_details(deck_hash, parent_dialog):
     # New Notes Deck Selection
     new_notes_group = QGroupBox("New Notes Deck (for notes not in your collection)")
     new_notes_layout = QVBoxLayout(new_notes_group)
-    
+
     # Option: Same as local deck
     same_deck_radio = QRadioButton("Use same deck as local deck")
     same_deck_radio.setChecked(True)  # Default
-    
+
     # Option: Custom deck
     custom_deck_radio = QRadioButton("Use a different deck:")
     new_notes_combo = QComboBox()
     new_notes_combo.addItems(deck_names)
     new_notes_combo.setEnabled(False)  # Initially disabled
-    
+
     # Pre-select current new notes deck if set
     current_new_notes_deck_id = details.get("new_notes_home_deck", None)
     if current_new_notes_deck_id and mw.col:
         try:
-            current_new_notes_deck_name = mw.col.decks.name_if_exists(current_new_notes_deck_id)
-            if current_new_notes_deck_name and current_new_notes_deck_name in deck_names:
+            current_new_notes_deck_name = mw.col.decks.name_if_exists(
+                current_new_notes_deck_id
+            )
+            if (
+                current_new_notes_deck_name
+                and current_new_notes_deck_name in deck_names
+            ):
                 custom_deck_radio.setChecked(True)
                 same_deck_radio.setChecked(False)
                 new_notes_combo.setEnabled(True)
@@ -438,14 +494,14 @@ def edit_subscription_details(deck_hash, parent_dialog):
         except (KeyError, AttributeError, TypeError):
             # Deck may have been deleted or collection unavailable - leave at default
             pass
-    
+
     # Radio button functionality
     def on_radio_changed():
         new_notes_combo.setEnabled(custom_deck_radio.isChecked())
-    
+
     same_deck_radio.toggled.connect(on_radio_changed)
     custom_deck_radio.toggled.connect(on_radio_changed)
-    
+
     new_notes_layout.addWidget(QLabel("Choose where new notes will be placed:"))
     new_notes_layout.addWidget(same_deck_radio)
     new_notes_layout.addWidget(custom_deck_radio)
@@ -455,30 +511,30 @@ def edit_subscription_details(deck_hash, parent_dialog):
     # Buttons - Cancel on left, Save on right
     button_layout = QHBoxLayout()
     button_layout.addStretch()
-    
-    cancel_button = QPushButton('Cancel')
-    cancel_button.setStyleSheet(get_button_style('neutral'))
-    
-    save_button = QPushButton('Save Changes')
-    save_button.setStyleSheet(get_button_style('success'))
-    
+
+    cancel_button = QPushButton("Cancel")
+    cancel_button.setStyleSheet(get_button_style("neutral"))
+
+    save_button = QPushButton("Save Changes")
+    save_button.setStyleSheet(get_button_style("success"))
+
     def save_changes():
         try:
             # Check if collection is available
             if not mw.col:
                 showInfo("Anki collection is not available. Please try again.")
                 return
-            
+
             # Validate deck selection
             local_deck_name = local_deck_combo.currentText()
             if not local_deck_name:
                 showInfo("Please select a local deck.")
                 return
-            
+
             # Save local deck
             local_deck_id = mw.col.decks.id(local_deck_name)
             details["deckId"] = local_deck_id
-            
+
             # Save new notes deck
             if same_deck_radio.isChecked():
                 # Remove new_notes_home_deck if it exists
@@ -490,35 +546,38 @@ def edit_subscription_details(deck_hash, parent_dialog):
                 if not new_notes_deck_name:
                     showInfo("Please select a new notes deck.")
                     return
-                
+
                 # Set custom new notes deck
                 new_notes_deck_id = mw.col.decks.id(new_notes_deck_name)
                 details["new_notes_home_deck"] = new_notes_deck_id
-            
+
             # Save to config
             mw.addonManager.writeConfig(__name__, strings_data)
             dialog.accept()
             parent_dialog.accept()  # Close parent dialog
             on_edit_list()  # Reopen with updated data
-            
+
         except Exception as e:
             showInfo(f"Error saving changes: {str(e)}")
             logger.exception("Error in save_changes")  # For debugging
-    
+
     save_button.clicked.connect(save_changes)
     cancel_button.clicked.connect(dialog.reject)
-    
+
     button_layout.addWidget(cancel_button)
     button_layout.addWidget(save_button)
     layout.addLayout(button_layout)
 
     dialog.exec()
 
+
 def edit_local_deck(table, parent_dialog):
-    selected_rows = list(set(index.row() for index in table.selectedIndexes())) # Get unique selected rows
+    selected_rows = list(
+        set(index.row() for index in table.selectedIndexes())
+    )  # Get unique selected rows
     if len(selected_rows) != 1:
-         showInfo("Please select exactly one subscription to edit.")
-         return
+        showInfo("Please select exactly one subscription to edit.")
+        return
 
     selected_row = selected_rows[0]
     input_hash = table.item(selected_row, 0).text()
@@ -526,7 +585,7 @@ def edit_local_deck(table, parent_dialog):
 
     # create popup dialog
     dialog = QDialog(mw)
-    dialog.setWindowTitle('Set Local Deck')
+    dialog.setWindowTitle("Set Local Deck")
     layout = QVBoxLayout()
     dialog.setLayout(layout)
 
@@ -539,7 +598,9 @@ def edit_local_deck(table, parent_dialog):
         return
 
     # Use all_names_and_ids for consistency and potential future use of IDs
-    decks = mw.col.decks.all_names_and_ids(skip_empty_default=True) # Skip "[Default]" if empty
+    decks = mw.col.decks.all_names_and_ids(
+        skip_empty_default=True
+    )  # Skip "[Default]" if empty
     deck_names = sorted([d.name for d in decks])
     deck_combo_box.addItems(deck_names)
 
@@ -548,20 +609,25 @@ def edit_local_deck(table, parent_dialog):
     if current_deck_name and current_deck_name in deck_names:
         deck_combo_box.setCurrentText(current_deck_name)
     elif deck_names:
-         deck_combo_box.setCurrentIndex(0) # Default to first if not set or not found
+        deck_combo_box.setCurrentIndex(0)  # Default to first if not set or not found
 
     layout.addWidget(deck_label)
     layout.addWidget(deck_combo_box)
 
-    save_button = QPushButton('Save')
-    save_button.clicked.connect(lambda: update_local_deck(input_hash, deck_combo_box.currentText(), dialog, parent_dialog))
+    save_button = QPushButton("Save")
+    save_button.clicked.connect(
+        lambda: update_local_deck(
+            input_hash, deck_combo_box.currentText(), dialog, parent_dialog
+        )
+    )
     layout.addWidget(save_button)
 
     dialog.exec()
 
+
 def on_push_deck_action():
     colors = get_colors()
-    
+
     dialog = QDialog(mw)
     dialog.setWindowTitle("AnkiCollab - Publish Deck")
     dialog.resize(560, 520)
@@ -583,7 +649,7 @@ def on_push_deck_action():
     header_layout = QVBoxLayout(header_widget)
     header_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
     header_layout.setContentsMargins(0, 0, 0, 10)
-    
+
     title_label = QLabel("Share Your Knowledge")
     title_label.setStyleSheet(f"""
         QLabel {{
@@ -594,7 +660,7 @@ def on_push_deck_action():
         }}
     """)
     title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    
+
     subtitle_label = QLabel("Publish your deck to help other Anki users learn and grow")
     subtitle_label.setStyleSheet(f"""
         QLabel {{
@@ -605,7 +671,7 @@ def on_push_deck_action():
     """)
     subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     subtitle_label.setWordWrap(True)
-    
+
     header_layout.addWidget(title_label)
     header_layout.addWidget(subtitle_label)
     main_layout.addWidget(header_widget)
@@ -615,15 +681,19 @@ def on_push_deck_action():
     deck_section.setStyleSheet(get_groupbox_style())
     deck_layout = QVBoxLayout(deck_section)
     deck_layout.setSpacing(8)
-    
-    deck_help_label = QLabel("Choose the deck you want to share with the AnkiCollab community:")
-    deck_help_label.setStyleSheet(f"color: {colors['text_secondary']}; font-size: 12px; margin-bottom: 8px;")
+
+    deck_help_label = QLabel(
+        "Choose the deck you want to share with the AnkiCollab community:"
+    )
+    deck_help_label.setStyleSheet(
+        f"color: {colors['text_secondary']}; font-size: 12px; margin-bottom: 8px;"
+    )
     deck_help_label.setWordWrap(True)
     deck_layout.addWidget(deck_help_label)
-    
+
     deck_combo_box = QComboBox()
     deck_combo_box.setStyleSheet(get_combobox_style())
-    
+
     decks = mw.col.decks.all_names_and_ids(include_filtered=False)
     deck_names = sorted([d.name for d in decks if "::" not in d.name])
     if not deck_names:
@@ -631,7 +701,7 @@ def on_push_deck_action():
         deck_combo_box.setEnabled(False)
     else:
         deck_combo_box.addItems(deck_names)
-    
+
     deck_layout.addWidget(deck_combo_box)
     main_layout.addWidget(deck_section)
 
@@ -640,7 +710,9 @@ def on_push_deck_action():
     legal_section.setStyleSheet(get_groupbox_style())
     legal_layout = QVBoxLayout(legal_section)
     legal_layout.setSpacing(15)
-    legal_layout.setContentsMargins(12, 15, 15, 12)  # Extra right margin to prevent cutoff
+    legal_layout.setContentsMargins(
+        12, 15, 15, 12
+    )  # Extra right margin to prevent cutoff
 
     # Copyright disclaimer
     disclaimer_container = QWidget()
@@ -648,7 +720,7 @@ def on_push_deck_action():
     disclaimer_layout.setContentsMargins(0, 0, 0, 0)
     disclaimer_layout.setSpacing(12)  # Increased spacing to prevent overlap
     disclaimer_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-    
+
     disclaimer_checkbox = QCheckBox()
     disclaimer_checkbox.setFixedSize(20, 20)  # Fixed size to prevent issues
     disclaimer_checkbox.setStyleSheet(f"""
@@ -667,10 +739,12 @@ def on_push_deck_action():
             background: {colors['accent']};
         }}
     """)
-    
-    disclaimer_text = QLabel("""I declare under penalty of perjury that the material I am sharing is 
+
+    disclaimer_text = QLabel(
+        """I declare under penalty of perjury that the material I am sharing is 
 entirely my own work, or I have obtained a license from the 
-intellectual property holder(s) to share it on AnkiCollab.""")
+intellectual property holder(s) to share it on AnkiCollab."""
+    )
     disclaimer_text.setWordWrap(True)
     disclaimer_text.setStyleSheet(f"""
         QLabel {{
@@ -679,8 +753,10 @@ intellectual property holder(s) to share it on AnkiCollab.""")
             line-height: 1.4;
         }}
     """)
-    disclaimer_text.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-    
+    disclaimer_text.setSizePolicy(
+        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+    )
+
     disclaimer_layout.addWidget(disclaimer_checkbox)
     disclaimer_layout.addWidget(disclaimer_text, 1)
     legal_layout.addWidget(disclaimer_container)
@@ -691,7 +767,7 @@ intellectual property holder(s) to share it on AnkiCollab.""")
     terms_layout.setContentsMargins(0, 0, 0, 0)
     terms_layout.setSpacing(12)  # Increased spacing to prevent overlap
     terms_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-    
+
     terms_checkbox = QCheckBox()
     terms_checkbox.setFixedSize(20, 20)  # Fixed size to prevent issues
     terms_checkbox.setStyleSheet(f"""
@@ -710,38 +786,42 @@ intellectual property holder(s) to share it on AnkiCollab.""")
             background: {colors['accent']};
         }}
     """)
-    
+
     terms_text_widget = QWidget()
     terms_text_layout = QHBoxLayout(terms_text_widget)
     terms_text_layout.setContentsMargins(0, 0, 0, 0)
     terms_text_layout.setSpacing(5)
-    
+
     terms_text = QLabel("I agree to the")
     terms_text.setStyleSheet(f"color: {colors['text_primary']}; font-size: 13px;")
-    
+
     # Use theme-aware link colors
-    link_color = colors['primary']
-    terms_link = QLabel(f'<a href="https://ankicollab.com/terms" style="color: {link_color}; text-decoration: none;">Terms of Service</a>')
+    link_color = colors["primary"]
+    terms_link = QLabel(
+        f'<a href="https://ankicollab.com/terms" style="color: {link_color}; text-decoration: none;">Terms of Service</a>'
+    )
     terms_link.setOpenExternalLinks(True)
     terms_link.setStyleSheet("font-size: 13px;")
-    
+
     and_text = QLabel("and")
     and_text.setStyleSheet(f"color: {colors['text_primary']}; font-size: 13px;")
-    
-    privacy_link = QLabel(f'<a href="https://ankicollab.com/privacy" style="color: {link_color}; text-decoration: none;">Privacy Policy</a>')
+
+    privacy_link = QLabel(
+        f'<a href="https://ankicollab.com/privacy" style="color: {link_color}; text-decoration: none;">Privacy Policy</a>'
+    )
     privacy_link.setOpenExternalLinks(True)
     privacy_link.setStyleSheet("font-size: 13px;")
-    
+
     terms_text_layout.addWidget(terms_text)
     terms_text_layout.addWidget(terms_link)
     terms_text_layout.addWidget(and_text)
     terms_text_layout.addWidget(privacy_link)
     terms_text_layout.addStretch()
-    
+
     terms_layout.addWidget(terms_checkbox)
     terms_layout.addWidget(terms_text_widget, 1)
     legal_layout.addWidget(terms_container)
-    
+
     main_layout.addWidget(legal_section)
 
     # Action buttons section
@@ -749,39 +829,45 @@ intellectual property holder(s) to share it on AnkiCollab.""")
     button_layout = QHBoxLayout(button_section)
     button_layout.setContentsMargins(0, 20, 0, 0)  # Top margin for spacing
     button_layout.addStretch()
-    
+
     # Cancel button
     cancel_button = QPushButton("Cancel")
-    cancel_button.setStyleSheet(get_button_style('neutral', 'large'))
+    cancel_button.setStyleSheet(get_button_style("neutral", "large"))
     cancel_button.clicked.connect(dialog.reject)
-    
+
     # Publish button
     publish_button = QPushButton("Publish Deck")
-    publish_button.setStyleSheet(get_button_style('success', 'large'))
+    publish_button.setStyleSheet(get_button_style("success", "large"))
 
     def validate_and_enable_publish():
         """Enable publish button only when all requirements are met"""
-        deck_selected = bool(deck_combo_box.currentText() and deck_combo_box.currentText() != "No suitable decks found")
+        deck_selected = bool(
+            deck_combo_box.currentText()
+            and deck_combo_box.currentText() != "No suitable decks found"
+        )
         disclaimer_checked = disclaimer_checkbox.isChecked()
         terms_checked = terms_checkbox.isChecked()
-        
+
         all_valid = deck_selected and disclaimer_checked and terms_checked
         publish_button.setEnabled(all_valid)
-        
+
         if all_valid:
             publish_button.setToolTip("Ready to publish your deck!")
         else:
             missing = []
-            if not deck_selected: missing.append("deck selection")
-            if not disclaimer_checked: missing.append("copyright declaration")
-            if not terms_checked: missing.append("terms agreement")
+            if not deck_selected:
+                missing.append("deck selection")
+            if not disclaimer_checked:
+                missing.append("copyright declaration")
+            if not terms_checked:
+                missing.append("terms agreement")
             publish_button.setToolTip(f"Please complete: {', '.join(missing)}")
 
     # Connect validation to all inputs
     deck_combo_box.currentTextChanged.connect(validate_and_enable_publish)
     disclaimer_checkbox.toggled.connect(validate_and_enable_publish)
     terms_checkbox.toggled.connect(validate_and_enable_publish)
-    
+
     # Initial validation
     validate_and_enable_publish()
 
@@ -789,13 +875,15 @@ intellectual property holder(s) to share it on AnkiCollab.""")
         if not disclaimer_checkbox.isChecked() or not terms_checkbox.isChecked():
             showInfo(
                 "You must agree to both the copyright declaration and the terms/privacy policy to publish your deck.",
-                parent=dialog
+                parent=dialog,
             )
             return
 
         # Check if collection is available
         if not mw.col:
-            showInfo("Anki collection is not available. Please try again.", parent=dialog)
+            showInfo(
+                "Anki collection is not available. Please try again.", parent=dialog
+            )
             return
 
         selected_deck_name = deck_combo_box.currentText()
@@ -806,7 +894,9 @@ intellectual property holder(s) to share it on AnkiCollab.""")
 
         deck_id = mw.col.decks.id(selected_deck_name)
         if not deck_id:
-            showInfo(f"Could not find deck ID for '{selected_deck_name}'.", parent=dialog)
+            showInfo(
+                f"Could not find deck ID for '{selected_deck_name}'.", parent=dialog
+            )
             return
 
         if not mw.col.decks.card_count(deck_id, include_subdecks=True):
@@ -814,7 +904,7 @@ intellectual property holder(s) to share it on AnkiCollab.""")
                 "This deck contains no notes.\n\n"
                 "Please add at least one note before publishing.",
                 parent=dialog,
-                title="Empty Deck"
+                title="Empty Deck",
             )
             return
 
@@ -823,13 +913,17 @@ intellectual property holder(s) to share it on AnkiCollab.""")
             if askUser(
                 f"Are you ready to publish '{selected_deck_name}' to AnkiCollab?\n\n"
                 f"This will make your deck available to the community.",
-                title="Confirm Publication"
+                title="Confirm Publication",
             ):
-                handle_export(deck_id)            
+                handle_export(deck_id)
                 dialog.accept()
-                
+
         except Exception as e:
-            showInfo(f"An error occurred during publishing: {e}", parent=dialog, title="Publication Error")
+            showInfo(
+                f"An error occurred during publishing: {e}",
+                parent=dialog,
+                title="Publication Error",
+            )
             logger.exception("Publishing error")
 
     publish_button.clicked.connect(on_publish_button_clicked)
@@ -837,7 +931,7 @@ intellectual property holder(s) to share it on AnkiCollab.""")
     button_layout.addStretch()
     button_layout.addWidget(cancel_button)
     button_layout.addWidget(publish_button)
-    
+
     main_layout.addWidget(button_section)
 
     # Set dialog properties with beautiful theme-aware background
@@ -850,21 +944,24 @@ intellectual property holder(s) to share it on AnkiCollab.""")
 
     dialog.exec()
 
+
 def show_global_settings_dialog(parent_dialog):
     """Show settings dialog (formerly deck structure settings)"""
     colors = get_colors()
-    
+
     dialog = QDialog(parent_dialog)
-    dialog.setWindowTitle('Global Settings')
+    dialog.setWindowTitle("Global Settings")
     dialog.setMinimumSize(420, 420)
     dialog.setStyleSheet(get_dialog_style())
-    
+
     layout = QVBoxLayout()
     dialog.setLayout(layout)
 
     # Header
     header_label = QLabel("Manage Your Global Settings")
-    header_label.setStyleSheet(f"font-size: 16px; font-weight: 500; margin: 10px 0; color: {colors['text_primary']};")
+    header_label.setStyleSheet(
+        f"font-size: 16px; font-weight: 500; margin: 10px 0; color: {colors['text_primary']};"
+    )
     header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(header_label)
 
@@ -885,49 +982,77 @@ def show_global_settings_dialog(parent_dialog):
     global_group = QGroupBox("Subscription Settings")
     global_group.setStyleSheet(get_groupbox_style())
     global_layout = QVBoxLayout(global_group)
-    
+
     checkbox_style = f"color: {colors['text_primary']};"
-    
+
     pull_on_startup_cb = QCheckBox("Update Decks on startup")
     pull_on_startup_cb.setStyleSheet(checkbox_style)
     pull_on_startup_cb.setChecked(bool(settings.get("pull_on_startup", False)))
-    pull_on_startup_cb.setToolTip("Automatically fetch updates when Anki opens (may slow startup)")
-    
+    pull_on_startup_cb.setToolTip(
+        "Automatically fetch updates when Anki opens (may slow startup)"
+    )
+
     suspend_new_cards_cb = QCheckBox("Automatically suspend new Cards")
     suspend_new_cards_cb.setStyleSheet(checkbox_style)
     suspend_new_cards_cb.setChecked(bool(settings.get("suspend_new_cards", False)))
-    suspend_new_cards_cb.setToolTip("New cards from updates start suspended - unsuspend them when ready to study")
-    
+    suspend_new_cards_cb.setToolTip(
+        "New cards from updates start suspended - unsuspend them when ready to study"
+    )
+
     move_cards_cb = QCheckBox("Do not move Cards automatically")
     move_cards_cb.setStyleSheet(checkbox_style)
     move_cards_cb.setChecked(bool(settings.get("auto_move_cards", False)))
-    move_cards_cb.setToolTip("Keep cards in their current deck even if the maintainer reorganizes them")
-    
+    move_cards_cb.setToolTip(
+        "Keep cards in their current deck even if the maintainer reorganizes them"
+    )
+
     keep_empty_subdecks_cb = QCheckBox("Keep empty subdecks")
     keep_empty_subdecks_cb.setStyleSheet(checkbox_style)
     keep_empty_subdecks_cb.setChecked(bool(settings.get("keep_empty_subdecks", False)))
-    keep_empty_subdecks_cb.setToolTip("Don't delete empty subdecks after sync - useful for custom organization")
-    
+    keep_empty_subdecks_cb.setToolTip(
+        "Don't delete empty subdecks after sync - useful for custom organization"
+    )
+
     auto_approve_cb = QCheckBox("Auto-approve changes (maintainer only)")
     auto_approve_cb.setStyleSheet(checkbox_style)
     auto_approve_cb.setChecked(bool(auth_manager.get_auto_approve()))
-    auto_approve_cb.setToolTip("Automatically approve outgoing changes for your decks. Only works if you are a maintainer.")
-    
+    auto_approve_cb.setToolTip(
+        "Automatically approve outgoing changes for your decks. Only works if you are a maintainer."
+    )
+
     error_reporting_cb = QCheckBox("Send anonymous error reports (recommended)")
     error_reporting_cb.setStyleSheet(checkbox_style)
     error_reporting_cb.setChecked(bool(settings.get("error_reporting_enabled", False)))
-    error_reporting_cb.setToolTip("Help us fix bugs faster - no personal data is collected")
-    
+    error_reporting_cb.setToolTip(
+        "Help us fix bugs faster - no personal data is collected"
+    )
+
+    remember_suggest_state_cb = QCheckBox(
+        "Remember 'Suggest on AnkiCollab' state between sessions"
+    )
+    remember_suggest_state_cb.setStyleSheet(checkbox_style)
+    remember_suggest_state_cb.setChecked(
+        bool(settings.get("remember_suggest_state_between_sessions", False))
+    )
+    remember_suggest_state_cb.setToolTip(
+        "When enabled, the add-on will remember whether the 'Suggest on AnkiCollab' checkbox in the Add Cards dialog was last checked or not, even after restarting Anki."
+    )
+
     global_layout.addWidget(pull_on_startup_cb)
     global_layout.addWidget(suspend_new_cards_cb)
     global_layout.addWidget(move_cards_cb)
     global_layout.addWidget(keep_empty_subdecks_cb)
     global_layout.addWidget(auto_approve_cb)
+    global_layout.addWidget(remember_suggest_state_cb)
+
+    # Add to group
     global_layout.addWidget(error_reporting_cb)
     layout.addWidget(global_group)
 
-    # Subscription Info section 
-    setting_info_label = QLabel("These settings apply globally to all your subscriptions. Changes take effect on the next import.")
+    # Subscription Info section
+    setting_info_label = QLabel(
+        "These settings apply globally to all your subscriptions. Changes take effect on the next import."
+    )
     setting_info_label.setWordWrap(True)
     setting_info_label.setStyleSheet(get_info_box_style())
     layout.addWidget(setting_info_label)
@@ -941,43 +1066,63 @@ def show_global_settings_dialog(parent_dialog):
     # Media groupbox
     media_group = QGroupBox("Media Settings")
     media_group.setStyleSheet(get_groupbox_style())
-    media_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+    media_group.setSizePolicy(
+        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+    )
     media_layout = QVBoxLayout(media_group)
     media_layout.setContentsMargins(6, 6, 6, 6)
     media_layout.setSpacing(6)
 
     media_import_button = QPushButton("Import Media from Folder")
-    media_import_button.setStyleSheet(get_button_style('neutral', 'small'))
+    media_import_button.setStyleSheet(get_button_style("neutral", "small"))
     media_import_button.setMaximumWidth(180)
-    media_import_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+    media_import_button.setSizePolicy(
+        QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed
+    )
     media_import_button.clicked.connect(on_media_btn)
     media_layout.addWidget(media_import_button)
 
-    media_info_label = QLabel("Import media files from a folder into your Anki collection.")
+    media_info_label = QLabel(
+        "Import media files from a folder into your Anki collection."
+    )
     media_info_label.setWordWrap(True)
-    media_info_label.setStyleSheet(f"color: {colors['text_secondary']}; font-size: 12px;")
-    media_info_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+    media_info_label.setStyleSheet(
+        f"color: {colors['text_secondary']}; font-size: 12px;"
+    )
+    media_info_label.setSizePolicy(
+        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+    )
     media_layout.addWidget(media_info_label)
 
     # Statistics groupbox
     stats_group = QGroupBox("Statistics")
     stats_group.setStyleSheet(get_groupbox_style())
-    stats_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+    stats_group.setSizePolicy(
+        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+    )
     stats_layout = QVBoxLayout(stats_group)
     stats_layout.setContentsMargins(6, 6, 6, 6)
     stats_layout.setSpacing(5)
 
     stats_push_button = QPushButton("Share Review History")
-    stats_push_button.setStyleSheet(get_button_style('neutral', 'small'))
+    stats_push_button.setStyleSheet(get_button_style("neutral", "small"))
     stats_push_button.setMaximumWidth(180)
-    stats_push_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+    stats_push_button.setSizePolicy(
+        QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed
+    )
     stats_push_button.clicked.connect(on_push_all_stats_action)
     stats_layout.addWidget(stats_push_button)
 
-    stats_info_label = QLabel("Share your review history to help the maintainers improve the deck.")
+    stats_info_label = QLabel(
+        "Share your review history to help the maintainers improve the deck."
+    )
     stats_info_label.setWordWrap(True)
-    stats_info_label.setStyleSheet(f"color: {colors['text_secondary']}; font-size: 12px;")
-    stats_info_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+    stats_info_label.setStyleSheet(
+        f"color: {colors['text_secondary']}; font-size: 12px;"
+    )
+    stats_info_label.setSizePolicy(
+        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+    )
     stats_layout.addWidget(stats_info_label)
 
     media_stats_layout.addWidget(media_group, 1)
@@ -988,13 +1133,13 @@ def show_global_settings_dialog(parent_dialog):
     button_layout = QHBoxLayout()
     button_layout.setContentsMargins(0, 0, 0, 0)
     button_layout.setSpacing(8)
-    
-    cancel_button = QPushButton('Cancel')
-    cancel_button.setStyleSheet(get_button_style('neutral'))
+
+    cancel_button = QPushButton("Cancel")
+    cancel_button.setStyleSheet(get_button_style("neutral"))
     cancel_button.clicked.connect(dialog.reject)
-    
-    save_button = QPushButton('Save Settings')
-    save_button.setStyleSheet(get_button_style('success'))
+
+    save_button = QPushButton("Save Settings")
+    save_button.setStyleSheet(get_button_style("success"))
 
     def save_global_settings():
         settings["preserve_deck_structure"] = True
@@ -1002,6 +1147,9 @@ def show_global_settings_dialog(parent_dialog):
         settings["suspend_new_cards"] = suspend_new_cards_cb.isChecked()
         settings["auto_move_cards"] = move_cards_cb.isChecked()
         settings["keep_empty_subdecks"] = keep_empty_subdecks_cb.isChecked()
+        settings["remember_suggest_state_between_sessions"] = (
+            remember_suggest_state_cb.isChecked()
+        )
         settings["error_reporting_enabled"] = error_reporting_cb.isChecked()
         mw.addonManager.writeConfig(__name__, strings_data)
         auth_manager.set_auto_approve(auto_approve_cb.isChecked())
@@ -1020,18 +1168,20 @@ def show_global_settings_dialog(parent_dialog):
     layout.addLayout(button_layout)
 
     dialog.exec()
-    
+
+
 def on_push_all_stats_action():
     token = auth_manager.get_token()
     if not token:
         return
     from .api_client import api_client
+
     check = api_client.post_empty("/CheckUserToken")
     if check.status_code != 200 or check.text != "true":
         if check.status_code != 401:
             auth_manager.handle_auth_failure()
             return
-    
+
     decks = DeckManager()
     for deck_hash, details in decks:
         if details.get("stats_enabled", False):
@@ -1042,34 +1192,38 @@ def on_push_all_stats_action():
                 op = QueryOp(
                     parent=mw,
                     op=lambda _: rh.upload_review_history(0),
-                    success=on_stats_upload_done
+                    success=on_stats_upload_done,
                 )
-                op.with_progress(
-                    "X Review History..."
-                ).run_in_background()
+                op.with_progress("X Review History...").run_in_background()
                 update_stats_timestamp(deck_hash)
-  
+
+
 def open_community_site():
-    webbrowser.open('https://discord.gg/9x4DRxzqwM')
+    webbrowser.open("https://discord.gg/9x4DRxzqwM")
+
 
 def open_support_site():
     rated_dialog = RateAddonDialog(mw)
     result = rated_dialog.exec()
 
+
 def open_website():
-    webbrowser.open('https://www.ankicollab.com/')
+    webbrowser.open("https://www.ankicollab.com/")
+
 
 def on_login_manager_btn():
     if auth_manager.is_logged_in():
         force_logout(False)
-        showInfo("You've been logged out successfully.\n\nYour subscriptions are still saved locally.")
+        showInfo(
+            "You've been logged out successfully.\n\nYour subscriptions are still saved locally."
+        )
     else:
         # Show Login Dialog
         dialog = LoginDialog(mw)
         result = dialog.exec()
-        if auth_manager.is_logged_in(): # Verify login status *after* dialog closes
+        if auth_manager.is_logged_in():  # Verify login status *after* dialog closes
             showInfo("Welcome back! You're now logged in.")
-            update_ui_for_login_state() # Update UI after successful login
+            update_ui_for_login_state()  # Update UI after successful login
 
 
 def store_default_config():
@@ -1080,17 +1234,20 @@ def store_default_config():
     if "settings" not in config:
         config["settings"] = {}
     if "auth" not in config:
-        config["auth"] = {} # Should be managed by auth_manager, but ensure key exists
+        config["auth"] = {}  # Should be managed by auth_manager, but ensure key exists
 
     defaults = {
         "pull_on_startup": False,
         "suspend_new_cards": False,
-        "auto_move_cards": False, # Note: Action text is "Do not move", so False means "Do move"
+        "auto_move_cards": False,  # Note: Action text is "Do not move", so False means "Do move"
         "keep_empty_subdecks": False,
         "rated_addon": False,
-        "last_ratepls": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+        "last_ratepls": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         "pull_counter": 0,
         "push_counter": 0,
+        # Add Cards: Suggest on AnkiCollab checkbox
+        "remember_suggest_state_between_sessions": False,
+        "suggest_on_ankicollab_last_state": False,
         # Error reporting (Sentry)
         "error_reporting_enabled": False,
     }
@@ -1104,6 +1261,7 @@ def store_default_config():
 
     if updated:
         mw.addonManager.writeConfig(__name__, config)
+
 
 def update_ui_for_login_state():
     logged_in = auth_manager.is_logged_in()
@@ -1129,6 +1287,7 @@ def update_ui_for_login_state():
     if logged_in:
         refresh_notifications()
 
+
 def menu_init():
     store_default_config()
 
@@ -1147,10 +1306,12 @@ def menu_init():
 
     links_menu.addAction(community_action)
     links_menu.addAction(website_action)
-    links_menu.addAction(donation_action) # Review link
+    links_menu.addAction(donation_action)  # Review link
 
     edit_list_action.triggered.connect(on_edit_list)
-    general_settings_action.triggered.connect(lambda: show_global_settings_dialog(parent_dialog=mw))
+    general_settings_action.triggered.connect(
+        lambda: show_global_settings_dialog(parent_dialog=mw)
+    )
     push_deck_action.triggered.connect(on_push_deck_action)
     pull_changes_action.triggered.connect(async_update)
     website_action.triggered.connect(open_website)
@@ -1158,4 +1319,6 @@ def menu_init():
     community_action.triggered.connect(open_community_site)
     login_manager_action.triggered.connect(on_login_manager_btn)
 
-    update_ui_for_login_state()
+    from aqt import gui_hooks
+
+    gui_hooks.main_window_did_init.append(update_ui_for_login_state)

@@ -17,6 +17,15 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from .var_defs import API_BASE_URL
+from .utils import get_logger
+
+logger = get_logger("ankicollab.api_client")
+
+
+class ApiConnectionError(requests.exceptions.ConnectionError):
+    """Raised when the client cannot connect to the AnkiCollab server."""
+
+    pass
 
 
 class _ApiClient:
@@ -35,13 +44,47 @@ class _ApiClient:
     def _get_token(self) -> str:
         """Lazily import ``auth_manager`` to avoid circular imports."""
         from .auth_manager import auth_manager
+
         return auth_manager.get_token()
 
     def _check_for_auth_failure(self, response: requests.Response) -> None:
         """If *response* is 401, clear local credentials and warn the user."""
         if response.status_code == 401:
             from .auth_manager import auth_manager
+
             auth_manager.handle_auth_failure()
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        **kwargs,
+    ) -> requests.Response:
+        """Execute an HTTP request and handle connection errors gracefully.
+
+        On ``ConnectionError`` or ``Timeout`` an ``ApiConnectionError`` is
+        raised with a user-friendly message so the workflow can abort cleanly.
+        Callers further up the stack are responsible for showing a single
+        error dialog.
+        """
+        try:
+            response = requests.request(method, url, **kwargs)
+            self._check_for_auth_failure(response)
+            return response
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as exc:
+            logger.warning(
+                "Network error during %s %s: %s",
+                method.upper(),
+                url,
+                exc,
+            )
+            raise ApiConnectionError(
+                "Unable to connect to AnkiCollab.\n\n"
+                "Please check your internet connection and try again."
+            ) from exc
 
     # ── public API ────────────────────────────────────────────────────
 
@@ -73,15 +116,14 @@ class _ApiClient:
             if not token:
                 raise RuntimeError("Not logged in – no valid auth token available")
             headers.update(self._auth_headers(token))
-        response = requests.post(
+        return self._request(
+            "POST",
             url,
             json=payload,
             headers=headers,
             timeout=timeout or self._timeout_default,
             verify=True,
         )
-        self._check_for_auth_failure(response)
-        return response
 
     def post_gzip(
         self,
@@ -105,15 +147,14 @@ class _ApiClient:
             "Content-Type": "text/plain",
             **self._auth_headers(token),
         }
-        response = requests.post(
+        return self._request(
+            "POST",
             url,
             data=compressed,
             headers=headers,
             timeout=timeout or self._timeout_large,
             verify=True,
         )
-        self._check_for_auth_failure(response)
-        return response
 
     def get(
         self,
@@ -130,9 +171,13 @@ class _ApiClient:
             if not token:
                 raise RuntimeError("Not logged in – no valid auth token available")
             headers.update(self._auth_headers(token))
-        response = requests.get(url, headers=headers, timeout=timeout or self._timeout_default, verify=True)
-        self._check_for_auth_failure(response)
-        return response
+        return self._request(
+            "GET",
+            url,
+            headers=headers,
+            timeout=timeout or self._timeout_default,
+            verify=True,
+        )
 
     def post_empty(
         self,
@@ -146,9 +191,13 @@ class _ApiClient:
         if not token:
             raise RuntimeError("Not logged in – no valid auth token available")
         headers = self._auth_headers(token)
-        response = requests.post(url, headers=headers, timeout=timeout or self._timeout_default, verify=True)
-        self._check_for_auth_failure(response)
-        return response
+        return self._request(
+            "POST",
+            url,
+            headers=headers,
+            timeout=timeout or self._timeout_default,
+            verify=True,
+        )
 
     def session_with_auth(self) -> requests.Session:
         """Return a ``requests.Session`` pre-configured with bearer auth.

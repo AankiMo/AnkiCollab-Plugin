@@ -1,26 +1,34 @@
 import sys
+import webbrowser
 from aqt import gui_hooks, mw
 from aqt.browser import Browser, SidebarTreeView, SidebarItem, SidebarItemType
 from anki.decks import DeckId
 from anki.notes import NoteId
 from aqt.qt import *
-from aqt.qt import QMenu, QModelIndex, QCheckBox, QDialogButtonBox, QApplication, QInputDialog
-from anki import hooks
-from anki.collection import Collection
+from aqt.qt import (
+    QMenu,
+    QModelIndex,
+    QCheckBox,
+    QDialogButtonBox,
+    QApplication,
+    QInputDialog,
+)
 from aqt.utils import askUser, showInfo
 from aqt.operations import QueryOp
 
 import json
 from typing import Sequence, List, Tuple, Optional
 
-from .media_manager import MediaManager # Import List
+from .media_manager import MediaManager  # Import List
 
 from .export_manager import *
 from .import_manager import *
 from .utils import get_deck_hash_from_card
-from .thread import run_function_in_thread
 
-from .gear_menu_setup import add_browser_menu_item, on_deck_browser_will_show_options_menu
+from .gear_menu_setup import (
+    add_browser_menu_item,
+    on_deck_browser_will_show_options_menu,
+)
 from .dialogs import AddChangelogDialog, ProtectFieldsDialog
 from .var_defs import PREFIX_PROTECTED_FIELDS
 
@@ -31,8 +39,9 @@ import requests
 
 logger = get_logger("ankicollab.hooks")
 
-added_editor_buttons = [] # Keep track of buttons added to editors
-added_addcards_widgets = [] # Keep track of widgets added to AddCards
+added_editor_buttons = []  # Keep track of buttons added to editors
+added_addcards_widgets = []  # Keep track of widgets added to AddCards
+
 
 def add_sidebar_context_menu(
     sidebar: SidebarTreeView, menu: QMenu, item: SidebarItem, index: QModelIndex
@@ -41,6 +50,7 @@ def add_sidebar_context_menu(
         menu.addSeparator()
         menu.addAction("Suggest on AnkiCollab", lambda: suggest_context_handler(item))
         menu.addAction("Add new Changelog", lambda: changelog_context_handler(item))
+
 
 def suggest_context_handler(item: SidebarItem):
     # Decide if this needs login. If so, add guard:
@@ -52,6 +62,7 @@ def suggest_context_handler(item: SidebarItem):
         suggest_subdeck(selected_deck)
     else:
         aqt.utils.tooltip("Please select a deck")
+
 
 def changelog_context_handler(item: SidebarItem):
     # Redundant check
@@ -68,57 +79,77 @@ def changelog_context_handler(item: SidebarItem):
     else:
         aqt.utils.tooltip("Please select a deck")
 
+
 def bulk_suggest_handler(browser: Browser, nids: Sequence[NoteId]) -> None:
     if not auth_manager.is_logged_in():
         showInfo("Please log in to suggest notes.", parent=browser)
         return
     if len(nids) < 2:
-        showInfo("Please use the regular suggest button for single notes", parent=browser)
+        showInfo(
+            "Please use the regular suggest button for single notes", parent=browser
+        )
         return
     suggest_notes(nids, 9)
 
+
 def remove_notes(nids: Sequence[NoteId], window=None) -> None:
     if not auth_manager.is_logged_in():
-         showInfo("Please log in to remove notes.", parent=window if window is not None else mw)
-         return
+        showInfo(
+            "Please log in to remove notes.",
+            parent=window if window is not None else mw,
+        )
+        return
 
-    if not nids: return # Nothing to remove
+    if not nids:
+        return  # Nothing to remove
 
     # Check if all notes belong to the *same* published deck
     first_note_card = aqt.mw.col.get_note(nids[0]).cards()[0]
     deckHash, error = get_deck_hash_from_card(first_note_card)
 
     if deckHash is None:
-        showInfo(error or "The selected note(s) do not belong to a published AnkiCollab deck.", parent=window if window is not None else mw)
+        showInfo(
+            error
+            or "The selected note(s) do not belong to a published AnkiCollab deck.",
+            parent=window if window is not None else mw,
+        )
         return
 
-    for nid in nids[1:]: # Check subsequent notes against the first one's deck hash
+    for nid in nids[1:]:  # Check subsequent notes against the first one's deck hash
         note = aqt.mw.col.get_note(nid)
-        if not note or not note.cards(): continue # Skip if note or cards are missing
+        if not note or not note.cards():
+            continue  # Skip if note or cards are missing
         current_hash, _ = get_deck_hash_from_card(note.cards()[0])
         if current_hash != deckHash:
-            showInfo("Please only select cards from the same published deck.", parent=window if window is not None else mw)
+            showInfo(
+                "Please only select cards from the same published deck.",
+                parent=window if window is not None else mw,
+            )
             return
 
     guids = get_guids_from_noteids(nids)
     if not guids:
-        showInfo("Could not retrieve unique identifiers for the selected notes.", parent=window if window is not None else mw)
+        showInfo(
+            "Could not retrieve unique identifiers for the selected notes.",
+            parent=window if window is not None else mw,
+        )
         return
 
-    (rationale, commit_text) = get_commit_info(11, parent=window)
+    rationale, commit_text = get_commit_info(11, parent=window)
     if rationale is None:
-        return # User cancelled
+        return  # User cancelled
 
     payload = {
-        'remote_deck': deckHash,
-        'note_guids': guids,
-        'commit_text': commit_text,
-        'force_overwrite': False # not implemented on the backend yet so we pass false welp
+        "remote_deck": deckHash,
+        "note_guids": guids,
+        "commit_text": commit_text,
+        "force_overwrite": False,  # not implemented on the backend yet so we pass false welp
     }
 
     # TODO: Background threading
     try:
         from .api_client import api_client
+
         response = api_client.post_json("/requestRemoval", payload, timeout=30)
         response.raise_for_status()
         logger.debug(f"Removal request response: {response.text}")
@@ -128,18 +159,26 @@ def remove_notes(nids: Sequence[NoteId], window=None) -> None:
         ):
             delete_notes(nids)
     except requests.exceptions.RequestException as e:
-        showInfo(f"Error requesting note removal: {e}", parent=window if window is not None else mw)
+        showInfo(
+            f"Error requesting note removal: {e}",
+            parent=window if window is not None else mw,
+        )
         logger.exception("Removal request failed")
         try:
             import sentry_sdk
+
             sentry_sdk.capture_exception(e)
         except Exception:
             pass
     except Exception as e:
-        showInfo(f"An unexpected error occurred: {e}", parent=window if window is not None else mw)
+        showInfo(
+            f"An unexpected error occurred: {e}",
+            parent=window if window is not None else mw,
+        )
         logger.exception("Unexpected error during removal request")
         try:
             import sentry_sdk
+
             sentry_sdk.capture_exception(e)
         except Exception:
             pass
@@ -158,44 +197,44 @@ def protect_fields_handler(browser: Browser, nids: Sequence[NoteId]) -> None:
     if not nids:
         showInfo("Please select at least one note.", parent=browser)
         return
-    
+
     # Get the note types (mids) of selected notes
     mids = set()
     for nid in nids:
         note = aqt.mw.col.get_note(nid)
         if note:
             mids.add(note.mid)
-    
+
     if len(mids) != 1:
         showInfo(
             "Please select notes of only one note type.",
             parent=browser,
         )
         return
-    
+
     # Get field names from the first note
     first_note = aqt.mw.col.get_note(nids[0])
     field_names = list(first_note.keys())
-    
+
     # Get currently protected fields from tags (for single note selection)
     current_protected = []
     if len(nids) == 1:
         current_protected = _get_protected_fields_from_tags(first_note)
-    
+
     # Show dialog
     dialog = ProtectFieldsDialog(field_names, current_protected, parent=browser)
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return
-    
+
     result = dialog.get_selected_fields()
     if result is None:
         return
-    
+
     selected_fields, protect_tags = result
-    
+
     # Determine which tags to apply
     new_protect_tags = []
-    
+
     if selected_fields:
         if set(selected_fields) == set(field_names):
             # All fields selected - use the All tag
@@ -204,29 +243,30 @@ def protect_fields_handler(browser: Browser, nids: Sequence[NoteId]) -> None:
             # Individual fields - create tag for each
             for field in selected_fields:
                 # Replace spaces with underscores (spaces not allowed in tags)
-                safe_field = field.replace(' ', '_')
+                safe_field = field.replace(" ", "_")
                 new_protect_tags.append(f"{PREFIX_PROTECTED_FIELDS}::{safe_field}")
-    
+
     if protect_tags:
         new_protect_tags.append(f"{PREFIX_PROTECTED_FIELDS}::Tags")
-    
+
     def update_notes_task():
         """Background task to update note tags."""
         notes = [aqt.mw.col.get_note(nid) for nid in nids]
         for note in notes:
             # Remove existing protection tags
             note.tags = [
-                tag for tag in note.tags 
+                tag
+                for tag in note.tags
                 if not tag.lower().startswith(PREFIX_PROTECTED_FIELDS.lower())
             ]
             # Add new protection tags
             note.tags.extend(new_protect_tags)
-        
+
         # Update notes with undo support
         undo_id = aqt.mw.col.add_custom_undo_entry("Protect fields of note(s)")
         aqt.mw.col.update_notes(notes)
         aqt.mw.col.merge_undo_entries(undo_id)
-    
+
     def on_done(future):
         """Callback when task completes."""
         try:
@@ -235,17 +275,21 @@ def protect_fields_handler(browser: Browser, nids: Sequence[NoteId]) -> None:
             showInfo(f"Error updating notes: {e}", parent=browser)
             logger.exception("Error protecting fields")
             return
-        
+
         aqt.mw.update_undo_actions()
         browser.table.reset()
-        
+
         if new_protect_tags:
-            aqt.utils.tooltip(f"Protected {len(new_protect_tags)} field(s)/tag(s) on {len(nids)} note(s)")
+            aqt.utils.tooltip(
+                f"Protected {len(new_protect_tags)} field(s)/tag(s) on {len(nids)} note(s)"
+            )
         else:
             aqt.utils.tooltip(f"Removed field protection from {len(nids)} note(s)")
-        
-        logger.info(f"Updated protection tags for {len(nids)} notes: {new_protect_tags}")
-    
+
+        logger.info(
+            f"Updated protection tags for {len(nids)} notes: {new_protect_tags}"
+        )
+
     aqt.mw.taskman.with_progress(
         task=update_notes_task,
         on_done=on_done,
@@ -257,12 +301,14 @@ def _get_protected_fields_from_tags(note) -> List[str]:
     """Extract currently protected field names from note tags."""
     protected = []
     prefix_lower = PREFIX_PROTECTED_FIELDS.lower()
-    
+
     for tag in note.tags:
         tag_lower = tag.lower()
         if tag_lower.startswith(prefix_lower + "::"):
             # Extract the field name part
-            field_part = tag[len(PREFIX_PROTECTED_FIELDS) + 2:]  # Skip "AnkiCollab_Protect::"
+            field_part = tag[
+                len(PREFIX_PROTECTED_FIELDS) + 2 :
+            ]  # Skip "AnkiCollab_Protect::"
             if field_part.lower() == "all":
                 # If "All" tag exists, return all field names
                 return list(note.keys()) + ["Tags"]
@@ -270,16 +316,18 @@ def _get_protected_fields_from_tags(note) -> List[str]:
                 protected.append("Tags")
             else:
                 # Convert underscores back to spaces for display
-                protected.append(field_part.replace('_', ' '))
-    
+                protected.append(field_part.replace("_", " "))
+
     return protected
+
 
 def context_menu_bulk_suggest(browser: Browser, context_menu: QMenu) -> None:
     if not auth_manager.is_logged_in():
-        return # Don't add menu items if not logged in
+        return  # Don't add menu items if not logged in
 
     selected_nids = browser.selected_notes()
-    if not selected_nids: return # Don't add if no notes selected
+    if not selected_nids:
+        return  # Don't add if no notes selected
 
     context_menu.addSeparator()
     context_menu.addAction(
@@ -316,12 +364,20 @@ def context_menu_bulk_suggest(browser: Browser, context_menu: QMenu) -> None:
                     if same_deck:
                         context_menu.addAction(
                             "AnkiCollab: Create note link(s)",
-                            lambda: create_note_links_handler(browser, selected_nids, subscriber_hash),
+                            lambda: create_note_links_handler(
+                                browser, selected_nids, subscriber_hash
+                            ),
                         )
     except Exception:
         pass
 
-def create_note_links_handler(browser: Browser, nids: Sequence[NoteId], subscriber_hash: str, base_hash: Optional[str] = None) -> None:
+
+def create_note_links_handler(
+    browser: Browser,
+    nids: Sequence[NoteId],
+    subscriber_hash: str,
+    base_hash: Optional[str] = None,
+) -> None:
     if not auth_manager.is_logged_in():
         showInfo("Please log in to link notes.", parent=browser)
         return
@@ -336,14 +392,19 @@ def create_note_links_handler(browser: Browser, nids: Sequence[NoteId], subscrib
             continue
         note_hash, _ = get_deck_hash_from_card(note.cards()[0])
         if note_hash != subscriber_hash:
-            showInfo("Please select notes from the same subscribed deck.", parent=browser)
+            showInfo(
+                "Please select notes from the same subscribed deck.", parent=browser
+            )
             return
 
     # Resolve base deck hash if not provided, allowing multiple linked base decks
     if base_hash is None:
         linked_hashes = _get_linked_base_hashes(subscriber_hash)
         if not linked_hashes:
-            showInfo("This subscribed deck has no linked base decks configured.", parent=browser)
+            showInfo(
+                "This subscribed deck has no linked base decks configured.",
+                parent=browser,
+            )
             return
         if len(linked_hashes) == 1:
             base_hash = linked_hashes[0]
@@ -377,6 +438,7 @@ def create_note_links_handler(browser: Browser, nids: Sequence[NoteId], subscrib
 
     def _op(_: object):
         from .api_client import api_client
+
         payload = {
             "subscriber_deck_hash": subscriber_hash,
             "base_deck_hash": base_hash,
@@ -422,22 +484,34 @@ def create_note_links_handler(browser: Browser, nids: Sequence[NoteId], subscrib
                         if nids:
                             open_browser_with_nids(nids)
                         else:
-                            showInfo("Could not find the skipped notes locally.", parent=browser)
+                            showInfo(
+                                "Could not find the skipped notes locally.",
+                                parent=browser,
+                            )
                 else:
                     showInfo(f"Linked {linked} note(s) successfully.", parent=browser)
                 return
             # If we couldn't parse, just show generic success
             showInfo("Note link(s) created.", parent=browser)
         elif status == 403 or (text or "").upper().find("FORBIDDEN") != -1:
-            showInfo("Forbidden: you don't have permission to link these notes.", parent=browser)
+            showInfo(
+                "Forbidden: you don't have permission to link these notes.",
+                parent=browser,
+            )
         elif status == -1:
-            showInfo(f"Network error while creating note link(s):\n{text}", parent=browser)
+            showInfo(
+                f"Network error while creating note link(s):\n{text}", parent=browser
+            )
         else:
-            showInfo(f"Failed to create note link(s) (status {status}).\n{text}", parent=browser)
+            showInfo(
+                f"Failed to create note link(s) (status {status}).\n{text}",
+                parent=browser,
+            )
 
-    QueryOp(parent=browser, op=_op, success=_on_success) \
-        .with_progress("Creating note link(s)...") \
-        .run_in_background()
+    QueryOp(parent=browser, op=_op, success=_on_success).with_progress(
+        "Creating note link(s)..."
+    ).run_in_background()
+
 
 def _get_linked_base_hashes(subscriber_hash: str) -> List[str]:
     """Return list of linked base deck hashes for a subscribed deck.
@@ -466,30 +540,74 @@ def _get_linked_base_hashes(subscriber_hash: str) -> List[str]:
     except Exception:
         return []
 
+
+def _open_note_on_ankicollab(note_id: NoteId, editor=None) -> None:
+    note = mw.col.get_note(note_id)
+    if not note or not note.cards():
+        showInfo(
+            "Could not find the note or its cards.",
+            parent=editor.parentWindow if editor and editor.parentWindow else mw,
+        )
+        return
+    note_guid = get_note_guid_from_id(note_id)
+    card = note.cards()[0]
+    deck_hash, error = get_deck_hash_from_card(card)
+
+    if deck_hash is None:
+        aqt.utils.showInfo(
+            error or "Cannot find the Cloud Deck for these notes.",
+            parent=editor.parentWindow if editor and editor.parentWindow else mw,
+        )
+        return
+
+    payload = {
+        "deck_hash": deck_hash,
+        "guid": note_guid,
+    }
+
+    from .api_client import api_client
+
+    response = api_client.post_json("/ResolveNoteReview", payload, timeout=30)
+    response.raise_for_status()
+
+    target_url = response.json()["url"]
+    webbrowser.open(target_url)
+
+
 def init_editor_card(buttons: List[str], editor):
-    # This hook adds a button PERMANENTLY to the editor instance.
-    # We need to check login status *at the time the editor opens*.
-    # If the user logs in *while* the editor is open, this button won't appear
-    # until a new editor window is opened. This is usually acceptable.
     if not auth_manager.is_logged_in():
         return buttons
 
     # Avoid duplicates in the "Add" Window
     if isinstance(editor.parentWindow, aqt.addcards.AddCards):
-         return buttons
+        return buttons
 
     b = editor.addButton(
         icon=None,
-        cmd="AnkiCollab",
+        cmd="AnkiCollab_Suggestion",
         func=lambda editor=editor: suggest_notes([editor.note.id], 2, editor=editor),
-        tip="Suggest changes to the cloud deck",
-        label="AnkiCollab",
+        tip="AnkiCollab: Suggest changes for this note",
+        label="AC: Suggest changes",
         keys=None,
-        disables=False
+        disables=False,
     )
-    
+
+    b2 = editor.addButton(
+        icon=None,
+        cmd="AnkiCollab_OpenNote",
+        func=lambda editor=editor: _open_note_on_ankicollab(
+            editor.note.id, editor=editor
+        ),
+        tip="AnkiCollab: Open this note on the website",
+        label="AC: ↗ Open",
+        keys=None,
+        disables=False,
+    )
+
     buttons.append(b)
+    buttons.append(b2)
     return buttons
+
 
 def init_add_card(addCardsDialog):
     if not auth_manager.is_logged_in():
@@ -499,35 +617,75 @@ def init_add_card(addCardsDialog):
     if hasattr(addCardsDialog, "ankicollab_suggest_checkbox"):
         return
 
+    cfg = mw.addonManager.getConfig(__name__) or {}
+    settings = cfg.get("settings", {}) if isinstance(cfg, dict) else {}
+    if not isinstance(settings, dict):
+        settings = {}
+    remember_between_sessions = bool(
+        settings.get("remember_suggest_state_between_sessions", False)
+    )
+
     checkbox = QCheckBox("Suggest on AnkiCollab")
-    addCardsDialog.ankicollab_suggest_checkbox = checkbox # Store reference on the dialog instance
+    if remember_between_sessions:
+        checkbox.setChecked(
+            bool(settings.get("suggest_on_ankicollab_last_state", True))
+        )
+    else:
+        checkbox.setChecked(False)
+
+    def _persist_suggest_checkbox_state(checked: bool) -> None:
+        # Keep the config read/write localized to this opt-in setting.
+        if not remember_between_sessions:
+            return
+        try:
+            current_cfg = mw.addonManager.getConfig(__name__) or {}
+            if not isinstance(current_cfg, dict):
+                return
+            current_settings = current_cfg.get("settings")
+            if not isinstance(current_settings, dict):
+                current_settings = {}
+                current_cfg["settings"] = current_settings
+            current_settings["suggest_on_ankicollab_last_state"] = bool(checked)
+            mw.addonManager.writeConfig(__name__, current_cfg)
+        except Exception:
+            # Never fail UI init due to settings persistence.
+            pass
+
+    checkbox.toggled.connect(_persist_suggest_checkbox_state)
+    addCardsDialog.ankicollab_suggest_checkbox = (
+        checkbox  # Store reference on the dialog instance
+    )
 
     button_box = None
-    if hasattr(addCardsDialog.form, 'buttonBox'):
-         button_box = addCardsDialog.form.buttonBox
+    if hasattr(addCardsDialog.form, "buttonBox"):
+        button_box = addCardsDialog.form.buttonBox
     else:
-         # Fallback search if needed (less robust)
-         for widget in addCardsDialog.findChildren(QDialogButtonBox):
-             button_box = widget
-             break
+        # Fallback search if needed (less robust)
+        for widget in addCardsDialog.findChildren(QDialogButtonBox):
+            button_box = widget
+            break
 
     if button_box:
-        button_box.layout().insertWidget(0, checkbox) # Insert at the beginning
-        added_addcards_widgets.append(checkbox) # Store reference if needed later
+        button_box.layout().insertWidget(0, checkbox)  # Insert at the beginning
+        added_addcards_widgets.append(checkbox)  # Store reference if needed later
     else:
         # Fallback: add to the main layout if button box not found
         addCardsDialog.layout().addWidget(checkbox)
-        logger.debug("Could not find buttonBox in AddCards dialog, added checkbox to main layout.")
+        logger.debug(
+            "Could not find buttonBox in AddCards dialog, added checkbox to main layout."
+        )
 
 
 def make_new_card(note: NoteId):
     """Called after a note is added via AddCards."""
     # Check if the checkbox exists and is checked
     if not auth_manager.is_logged_in():
-        return # Should not be reachable if checkbox wasn't added, but safe check
+        return  # Should not be reachable if checkbox wasn't added, but safe check
 
     # Access the checkbox via the main window's AddCards instance (if available)
-    add_cards_window = getattr(mw, "add_cards_dialog", None) # Assuming you store the ref somewhere, or find it
+    add_cards_window = getattr(
+        mw, "add_cards_dialog", None
+    )  # Assuming you store the ref somewhere, or find it
     if not add_cards_window:
         # Try finding the active AddCards window (less reliable)
         for widget in QApplication.topLevelWidgets():
@@ -535,10 +693,14 @@ def make_new_card(note: NoteId):
                 add_cards_window = widget
                 break
 
-    checkbox = getattr(add_cards_window, "ankicollab_suggest_checkbox", None) if add_cards_window else None
+    checkbox = (
+        getattr(add_cards_window, "ankicollab_suggest_checkbox", None)
+        if add_cards_window
+        else None
+    )
 
     if checkbox and checkbox.isChecked():
-        suggest_notes([note.id], 6) # New card rationale
+        suggest_notes([note.id], 6)  # New card rationale
 
 
 def request_update(silent) -> None:
@@ -549,6 +711,7 @@ def request_update(silent) -> None:
     # Validate token with server before starting the pull
     try:
         from .api_client import api_client
+
         check = api_client.post_empty("/CheckUserToken", timeout=5)
         if check.status_code != 200 or check.text != "true":
             # api_client already called handle_auth_failure() for 401
@@ -563,6 +726,7 @@ def request_update(silent) -> None:
 
     handle_pull(None, silent)
 
+
 def async_update(silent: bool = False) -> None:
     """Asynchronous update check. This is called when the user clicks the update button."""
     if not auth_manager.is_logged_in():
@@ -570,6 +734,7 @@ def async_update(silent: bool = False) -> None:
         return
 
     request_update(silent)
+
 
 def autoUpdate():
     config = mw.addonManager.getConfig(__name__)
@@ -579,11 +744,11 @@ def autoUpdate():
     if startup_check_enabled:
         # Run the update once the ankiweb sync is done
         if mw.pm.auto_syncing_enabled() and mw.pm.sync_auth() and not mw.safeMode:
-        
+
             def on_sync_finished_hk():
                 # run reload_data AFTER sync is finished
                 async_update(True)
-                
+
                 try:
                     gui_hooks.sync_did_finish.remove(on_sync_finished_hk)
                 except ValueError:
@@ -593,21 +758,23 @@ def autoUpdate():
         else:
             # No auto-sync or not configured for sync, run immediately
             async_update(True)
-        
+
 
 import struct
 
 original_get_image_dimensions_ioe = None
 ioe_imghdr = None
+
+
 def hk_get_image_dimensions(image_path: str) -> Tuple[int, int]:
     global original_get_image_dimensions_ioe
     if image_path.endswith(".webp"):
         height = -1
         width = -1
-        with open(image_path, 'rb') as fhandle:
+        with open(image_path, "rb") as fhandle:
             head = fhandle.read(31)
             size = len(head)
-            if size >= 12 and head.startswith(b'RIFF') and head[8:12] == b'WEBP':
+            if size >= 12 and head.startswith(b"RIFF") and head[8:12] == b"WEBP":
                 if head[12:16] == b"VP8 ":
                     width, height = struct.unpack("<HH", head[26:30])
                 elif head[12:16] == b"VP8X":
@@ -616,12 +783,15 @@ def hk_get_image_dimensions(image_path: str) -> Tuple[int, int]:
                 elif head[12:16] == b"VP8L":
                     b = head[21:25]
                     width = (((b[1] & 63) << 8) | b[0]) + 1
-                    height = (((b[3] & 15) << 10) | (b[2] << 2) | ((b[1] & 192) >> 6)) + 1
+                    height = (
+                        ((b[3] & 15) << 10) | (b[2] << 2) | ((b[1] & 192) >> 6)
+                    ) + 1
                 else:
                     raise ValueError("Unsupported WebP file")
                 return width, height
     return original_get_image_dimensions_ioe(image_path)
-    
+
+
 def patch_image_occlusion_enhanced():
     utils_module = "1374772155.utils"
     add_module = "1374772155.add"
@@ -635,32 +805,31 @@ def patch_image_occlusion_enhanced():
     ioe_utils.get_image_dimensions = hk_get_image_dimensions
     ioe_add.get_image_dimensions = hk_get_image_dimensions
     return True
-    
+
+
 def onProfileLoaded():
     """Called when the Anki profile finishes loading."""
     from . import main
 
-    if not main.media_manager.is_manager_available(): # re-init after profile switching
-        main.media_manager = MediaManager(
-            api_base_url=API_BASE_URL,
-            media_folder=""
-        )
+    if not main.media_manager.is_manager_available():  # re-init after profile switching
+        main.media_manager = MediaManager(api_base_url=API_BASE_URL, media_folder="")
     main.media_manager.set_media_folder(mw.col.media.dir())
-    
+
     autoUpdate()
     refresh_notifications()
     patch_successful = patch_image_occlusion_enhanced()
     logger.info(f"Image Occlusion Enhanced patch: {patch_successful}")
 
+
 def onProfileWillClose():
     """Called when the Anki profile is about to close."""
     import asyncio
     from . import main
-    
+
     # Create a task to close the media manager
     async def close_media_manager():
         await main.media_manager.close()
-    
+
     # Run the close operation
     try:
         # Try to get the current event loop
@@ -671,9 +840,11 @@ def onProfileWillClose():
         # No running loop, run synchronously
         asyncio.run(close_media_manager())
 
+
 def update_hooks_for_login_state(logged_in: bool):
-    #placeholder for future use
+    # placeholder for future use
     pass
+
 
 # --- Hook Registration ---
 def hooks_init():

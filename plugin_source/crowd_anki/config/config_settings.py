@@ -35,19 +35,22 @@ class ConfigSettings:
 
     @property
     def formatted_export_note_sort_methods(self) -> list:
-        return [
-            NoteSortingMethods(method)
-            for method in self.export_note_sort_methods
-        ]
+        return [NoteSortingMethods(method) for method in self.export_note_sort_methods]
 
     class Properties(Enum):
         SNAPSHOT_PATH = ConfigEntry("snapshot_path", str(USER_FILES_PATH.resolve()))
         AUTOMATED_SNAPSHOT = ConfigEntry("automated_snapshot", False)
         SNAPSHOT_ROOT_DECKS = ConfigEntry("snapshot_root_decks", [])
-        EXPORT_NOTE_SORT_METHODS = ConfigEntry("export_note_sort_methods", [NoteSortingMethods.NO_SORTING.value])
+        EXPORT_NOTE_SORT_METHODS = ConfigEntry(
+            "export_note_sort_methods", [NoteSortingMethods.NO_SORTING.value]
+        )
         EXPORT_NOTES_REVERSE_ORDER = ConfigEntry("export_notes_reverse_order", False)
-        EXPORT_CREATE_DECK_SUBDIRECTORY = ConfigEntry("export_create_deck_subdirectory", True)
-        IMPORT_NOTES_IGNORE_DECK_MOVEMENT = ConfigEntry("import_notes_ignore_deck_movement", False)
+        EXPORT_CREATE_DECK_SUBDIRECTORY = ConfigEntry(
+            "export_create_deck_subdirectory", True
+        )
+        IMPORT_NOTES_IGNORE_DECK_MOVEMENT = ConfigEntry(
+            "import_notes_ignore_deck_movement", False
+        )
 
     def __init__(self, addon_manager=None, init_values=None, profile_manager=None):
         self._profile_manager = profile_manager or mw.pm
@@ -58,7 +61,9 @@ class ConfigSettings:
     @classmethod
     def get_instance(cls, addon_manager=None, profile_manager=None):
         if cls.__instance is None:
-            cls.__instance = ConfigSettings(addon_manager=addon_manager, profile_manager=profile_manager)
+            cls.__instance = ConfigSettings(
+                addon_manager=addon_manager, profile_manager=profile_manager
+            )
         return cls.__instance
 
     @property
@@ -85,9 +90,11 @@ class ConfigSettings:
     def find_invalid_config_values(self):
         self.try_infer_values()
 
-        incorrect_sort_methods = [method
-                                  for method in self.export_note_sort_methods
-                                  if method not in NoteSortingMethods.values()]
+        incorrect_sort_methods = [
+            method
+            for method in self.export_note_sort_methods
+            if method not in NoteSortingMethods.values()
+        ]
 
         return incorrect_sort_methods
 

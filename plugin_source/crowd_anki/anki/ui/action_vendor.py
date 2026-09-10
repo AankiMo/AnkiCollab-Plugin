@@ -25,8 +25,12 @@ class ActionVendor:
         pass
 
     def import_action(self):
-        return self.action('CrowdAnki: Import from disk',
-                           lambda: AnkiJsonImporter.import_deck(self.window.col, self.directory_vendor))
+        return self.action(
+            "CrowdAnki: Import from disk",
+            lambda: AnkiJsonImporter.import_deck(
+                self.window.col, self.directory_vendor
+            ),
+        )
 
     def github_import(self):
         pass
@@ -38,4 +42,4 @@ class ActionVendor:
         pass
 
     def snapshot_and_exit(self):
-        return self.action('CrowdAnki: Snapshot and Exit', self._snapshot_and_exit)
+        return self.action("CrowdAnki: Snapshot and Exit", self._snapshot_and_exit)

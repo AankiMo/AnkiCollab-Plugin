@@ -19,7 +19,9 @@ class ConfigEntry:
 
 @dataclass
 class PersonalFieldsHolder:
-    personal_fields: defaultdict = field(init=False, default_factory=lambda: defaultdict(list))
+    personal_fields: defaultdict = field(
+        init=False, default_factory=lambda: defaultdict(list)
+    )
 
     def is_personal_field(self, model_name, field_name):
         if model_name in self.personal_fields:
@@ -30,6 +32,7 @@ class PersonalFieldsHolder:
     def add_field(self, model_name, field_name):
         self.personal_fields[model_name].append(field_name)
 
+
 @dataclass
 class ImportConfig(PersonalFieldsHolder):
     optional_tags: List[str]
@@ -39,15 +42,13 @@ class ImportConfig(PersonalFieldsHolder):
     use_notes: bool
     use_media: bool
 
-    ignore_deck_movement: bool    
+    ignore_deck_movement: bool
     suspend_new_cards: bool
     keep_empty_subdecks: bool
-    
+
     home_deck: Optional[str] = None
     deck_hash: Optional[str] = None
     new_notes_home_deck: Optional[str] = None
-    
-    
 
 
 @dataclass
@@ -60,11 +61,14 @@ class ImportDefaults(PersonalFieldsHolder):
         SUGGEST_TAG_IMPORTED_CARDS = ConfigEntry("suggest_tag_imported_cards", False)
 
     @classmethod
-    def from_dict(cls, settings_dict: dict) -> 'ImportDefaults':
+    def from_dict(cls, settings_dict: dict) -> "ImportDefaults":
         new_cls = cls()
         for prop in cls.Properties:
-            setattr(new_cls, prop.value.config_name,
-                    settings_dict.get(prop.value.config_name, prop.value.default_value))
+            setattr(
+                new_cls,
+                prop.value.config_name,
+                settings_dict.get(prop.value.config_name, prop.value.default_value),
+            )
         new_cls._setup_personal_fields(settings_dict)
         return new_cls
 
@@ -82,7 +86,7 @@ class ImportDefaults(PersonalFieldsHolder):
 #     use_media: bool
 
 #     ignore_deck_movement: bool
-    
+
 #     deckHash: str = None
 
 

@@ -1,8 +1,7 @@
 import os
-import json
+import sys
 import time
 import requests
-import keyring
 import logging
 from datetime import datetime
 from aqt import mw
@@ -14,98 +13,130 @@ from .var_defs import API_BASE_URL
 
 KEYRING_SERVICE = "AnkiCollab"
 
-class AuthManager:    
+
+# On Windows/macOS use the system keyring for token storage. On Linux the
+# keyring package is not shipped with the addon, so store secrets in the
+# addon config file instead.
+def _config_get_password(service, username):
+    """Read a stored secret from the addon config file (Linux fallback)."""
+    config = mw.addonManager.getConfig(__name__) or {}
+    return config.get("auth", {}).get(username)
+
+
+def _config_set_password(service, username, password):
+    """Persist a secret in the addon config file (Linux fallback)."""
+    config = mw.addonManager.getConfig(__name__) or {}
+    config.setdefault("auth", {})[username] = password
+    mw.addonManager.writeConfig(__name__, config)
+
+
+def _config_delete_password(service, username):
+    """Remove a secret from the addon config file (Linux fallback)."""
+    config = mw.addonManager.getConfig(__name__) or {}
+    secrets = config.get("auth", {})
+    if username in secrets:
+        del secrets[username]
+        mw.addonManager.writeConfig(__name__, config)
+
+
+if sys.platform in ("win32", "darwin"):
+    try:
+        import keyring
+
+        get_password = keyring.get_password
+        set_password = keyring.set_password
+        delete_password = keyring.delete_password
+    except ImportError:
+        logging.getLogger(__name__).warning(
+            "keyring not available on %s, falling back to config storage",
+            sys.platform,
+        )
+        get_password = _config_get_password
+        set_password = _config_set_password
+        delete_password = _config_delete_password
+else:
+    # Linux (or other platforms): keyring is not shipped, use config storage.
+    get_password = _config_get_password
+    set_password = _config_set_password
+    delete_password = _config_delete_password
+
+
+class AuthManager:
     def __init__(self):
         self.config_key = __name__
-        self._keyring_available = True
-        self._keyring_warned = False
-        self._load_auth_data()
+        self.auth_data = {}
 
-    def _warn_keyring_fallback_once(self, reason):
-        if self._keyring_warned:
-            return
-        self._keyring_warned = True
-        logging.getLogger(__name__).warning(
-            "Keyring unavailable, falling back to config storage: %s",
-            reason,
-        )
+        from aqt import gui_hooks
+
+        gui_hooks.main_window_did_init.append(self._load_auth_data)
 
     def _write_auth_config(self, auth_payload):
         strings_data = mw.addonManager.getConfig(self.config_key) or {}
         strings_data["auth"] = auth_payload
         mw.addonManager.writeConfig(self.config_key, strings_data)
-    
+
     def _load_auth_data(self):
-        """Load authentication data from Anki config and keyring"""
+        """Load authentication data from Anki config and credential storage"""
         self.auth_data = {}
         strings_data = mw.addonManager.getConfig(self.config_key)
         if strings_data and "auth" in strings_data:
             self.auth_data = strings_data["auth"]
-            
-        if not self._keyring_available:
-            return
 
         try:
-            token = keyring.get_password(KEYRING_SERVICE, "token")
+            token = get_password(KEYRING_SERVICE, "token")
             if token is not None:
                 self.auth_data["token"] = token
-                
-            refresh_token = keyring.get_password(KEYRING_SERVICE, "refresh_token")
+
+            refresh_token = get_password(KEYRING_SERVICE, "refresh_token")
             if refresh_token is not None:
                 self.auth_data["refresh_token"] = refresh_token
         except Exception as e:
-            self._keyring_available = False
-            self._warn_keyring_fallback_once(e)
-    
+            logging.getLogger(__name__).warning(
+                "Failed to load credentials from secure storage: %s", e
+            )
+
     def _save_auth_data(self):
-        """Save authentication data to Anki config and keyring"""
+        """Save authentication data to Anki config and credential storage"""
         config_auth = self.auth_data.copy()
         token = config_auth.pop("token", None)
         refresh_token = config_auth.pop("refresh_token", None)
 
-        if not self._keyring_available:
-            if token is not None:
-                config_auth["token"] = token
-            if refresh_token is not None:
-                config_auth["refresh_token"] = refresh_token
-            self._write_auth_config(config_auth)
-            return
-        
         self._write_auth_config(config_auth)
-        
+
         try:
             if token is not None:
-                keyring.set_password(KEYRING_SERVICE, "token", token)
+                set_password(KEYRING_SERVICE, "token", token)
             else:
-                try: 
-                    keyring.delete_password(KEYRING_SERVICE, "token")
-                except Exception: 
+                try:
+                    delete_password(KEYRING_SERVICE, "token")
+                except Exception:
                     pass
-                
+
             if refresh_token is not None:
-                keyring.set_password(KEYRING_SERVICE, "refresh_token", refresh_token)
+                set_password(KEYRING_SERVICE, "refresh_token", refresh_token)
             else:
-                try: 
-                    keyring.delete_password(KEYRING_SERVICE, "refresh_token")
-                except Exception: 
+                try:
+                    delete_password(KEYRING_SERVICE, "refresh_token")
+                except Exception:
                     pass
         except Exception as e:
-            self._keyring_available = False
-            self._warn_keyring_fallback_once(e)
+            logging.getLogger(__name__).warning(
+                "Failed to save credentials to secure storage: %s", e
+            )
             aqt.utils.showInfo(
                 "Secure token storage is unavailable. Please unlock keyring storage and try again."
             )
             raise
-    
+
     def store_login_result(self, auth_response):
         if not auth_response:
             return False
-            
+
         self.auth_data = {
             "token": auth_response.get("token", ""),
             "refresh_token": auth_response.get("refresh_token", ""),
         }
-        
+
         if "expires_at" in auth_response:
             try:
                 expires_val = auth_response["expires_at"]
@@ -119,19 +150,21 @@ class AuthManager:
                 else:
                     raise TypeError("Invalid type for expires_at")
             except Exception:
-                self.auth_data["expires_timestamp"] = time.time() + (30 * 86400)  # 30 days
-        
+                self.auth_data["expires_timestamp"] = time.time() + (
+                    30 * 86400
+                )  # 30 days
+
         # Save to config
         self._save_auth_data()
         return True
-    
+
     def get_token(self):
         """Get the current access token, refreshing if needed"""
         self._load_auth_data()  # Reload in case it changed
-        
+
         if not self.auth_data or "token" not in self.auth_data:
             return ""
-            
+
         # Check if token needs refresh (less than 1 day remaining)
         if self._should_refresh_token():
             if not self.refresh_token():
@@ -139,31 +172,31 @@ class AuthManager:
                 self.auth_data = {}
                 self._save_auth_data()
                 return ""
-        
+
         return self.auth_data.get("token", "")
-    
+
     def _should_refresh_token(self):
         """Check if token needs to be refreshed (less than 1 day to expiration)"""
         if "expires_timestamp" not in self.auth_data:
             return False  # No expiry info, can't determine
-            
+
         # Refresh if less than 1 day remaining
         time_remaining = self.auth_data["expires_timestamp"] - time.time()
         return time_remaining < 86400  # 1 day in seconds
-    
+
     def refresh_token(self):
         """Attempt to refresh the access token using refresh token"""
         if not self.auth_data or "refresh_token" not in self.auth_data:
             return False
-            
+
         try:
             response = requests.post(
                 f"{API_BASE_URL}/refreshToken",
                 json={"refresh_token": self.auth_data["refresh_token"]},
                 headers={"Content-Type": "application/json"},
-                timeout=15
+                timeout=15,
             )
-            
+
             if response.status_code == 200:
                 new_auth = response.json()
                 return self.store_login_result(new_auth)
@@ -171,39 +204,42 @@ class AuthManager:
                 return False
         except Exception:
             return False
-    
+
     def is_logged_in(self):
         """Check if user has a valid token"""
         return self.get_token() != ""
-    
+
     def get_auto_approve(self):
         """Get auto-approve setting"""
         self._load_auth_data()
         return self.auth_data.get("auto_approve", False)
-    
+
     def set_auto_approve(self, value):
         """Set auto-approve setting"""
         self._load_auth_data()
         self.auth_data["auto_approve"] = bool(value)
         self._save_auth_data()
-    
+
     def handle_auth_failure(self):
         """Handle a 401 response by clearing credentials locally and warning the user.
-        
+
         Unlike logout(), this does NOT contact the server (the token is already
         invalid on the server side). Safe to call from any thread.
         """
         if not self.auth_data:
             return  # Already logged out
-        
+
         self.auth_data = {}
         self._save_auth_data()
-        
+
         # Silently update UI on the main thread (safe from background threads)
         if mw and mw.taskman:
+
             def _on_main():
                 from .menu import update_ui_for_login_state
+
                 update_ui_for_login_state()
+
             mw.taskman.run_on_main(_on_main)
 
     def logout(self):
@@ -219,11 +255,14 @@ class AuthManager:
                 )
             except Exception as e:
                 # Server-side token may remain valid until expiry
-                logging.getLogger(__name__).warning("Failed to invalidate token on server: %s", e)
-        
+                logging.getLogger(__name__).warning(
+                    "Failed to invalidate token on server: %s", e
+                )
+
         # Clear stored credentials regardless of server response
         self.auth_data = {}
         self._save_auth_data()
+
 
 # singleton
 auth_manager = AuthManager()

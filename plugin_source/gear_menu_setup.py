@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 import webbrowser
 
@@ -24,23 +23,34 @@ except ImportError:
     from aqt.browser import Browser
 
 from aqt.qt import *
-from aqt.qt import QMenu, QAction, qconnect  # explicit imports for linters/type checkers
+from aqt.qt import (
+    QMenu,
+    QAction,
+    qconnect,
+)  # explicit imports for linters/type checkers
 
-from .media_export import DeckMediaExporter, NoteMediaExporter, get_configured_search_field, get_configured_exts, export_with_progress
+from .media_export import (
+    DeckMediaExporter,
+    NoteMediaExporter,
+    get_configured_search_field,
+    get_configured_exts,
+    export_with_progress,
+)
+
 
 def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
     """Adds a menu item under the gears icon to export a deck's media files."""
     if not auth_manager.is_logged_in():
         return
-    
+
     def export_media() -> None:
         config = mw.addonManager.getConfig(__name__)
         field = get_configured_search_field(config)
         exts = get_configured_exts(config)
         exporter = DeckMediaExporter(mw.col, DeckId(did), field, exts)
         note_count = mw.col.decks.card_count([DeckId(did)], include_subdecks=True)
-        export_with_progress(mw, exporter, note_count)            
-        
+        export_with_progress(mw, exporter, note_count)
+
     def download_missing_media() -> None:
         if did is None:
             aqt.utils.tooltip("No valid deck!")
@@ -57,15 +67,17 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
             aqt.utils.tooltip("No valid deck!")
             return
         media_result = {
-                        "success": False, 
-                        "downloaded": 0, 
-                        "skipped": 0,
-                        "deck_hash": deck_hash,
-                        "missing_files": missing_media
-                    }
-        
-        deck._start_media_download_from_main_thread(deck_hash, missing_media, media_result)
-        
+            "success": False,
+            "downloaded": 0,
+            "skipped": 0,
+            "deck_hash": deck_hash,
+            "missing_files": missing_media,
+        }
+
+        deck._start_media_download_from_main_thread(
+            deck_hash, missing_media, media_result
+        )
+
     def reset_deck_timestamp():
         deck_hash = get_deck_hash_from_did(did)
         if deck_hash is None:
@@ -81,7 +93,7 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
                     aqt.utils.tooltip("Deck timestamp reset")
                     break
             mw.addonManager.writeConfig(__name__, strings_data)
-            
+
     def upload_missing_media():
         if did is None:
             aqt.utils.tooltip("No valid deck!")
@@ -93,11 +105,9 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
         op = QueryOp(
             parent=mw,
             op=lambda _: get_server_missing_media(deck_hash),
-            success= lambda result: start_suggest_missing_media(result),
+            success=lambda result: start_suggest_missing_media(result),
         )
-        op.with_progress(
-            "Checking for missing media..."
-        ).run_in_background()
+        op.with_progress("Checking for missing media...").run_in_background()
 
     def create_deck_link() -> None:
         # Only applicable to subscribed decks
@@ -129,6 +139,7 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
 
         def _post_create_link(_: object):
             from .api_client import api_client
+
             payload = {
                 "subscriber_deck_hash": subscriber_hash,
                 "base_deck_hash": base_hash,
@@ -166,19 +177,25 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
                     hashes.append(base_hash)
                 details["linked_deck_hashes"] = hashes
                 mw.addonManager.writeConfig(__name__, strings_data)
-                aqt.utils.showInfo("Deck link added. Configure notetypes before creating any note links!")
+                aqt.utils.showInfo(
+                    "Deck link added. Configure notetypes before creating any note links!"
+                )
             elif status == 403 or (text or "").upper().find("FORBIDDEN") != -1:
-                aqt.utils.showWarning("Forbidden: you don't have permission to link these decks.")
+                aqt.utils.showWarning(
+                    "Forbidden: you don't have permission to link these decks."
+                )
             elif status == -1:
                 aqt.utils.showWarning(f"Network error while creating link:\n{text}")
             else:
-                aqt.utils.showWarning(f"Failed to create deck link (status {status}).\n{text}")
+                aqt.utils.showWarning(
+                    f"Failed to create deck link (status {status}).\n{text}"
+                )
 
-        QueryOp(parent=mw, op=_post_create_link, success=_on_success) \
-            .with_progress("Creating deck link...") \
-            .run_in_background()
-            
-    links_menu = QMenu('AnkiCollab', mw)
+        QueryOp(parent=mw, op=_post_create_link, success=_on_success).with_progress(
+            "Creating deck link..."
+        ).run_in_background()
+
+    links_menu = QMenu("AnkiCollab", mw)
     menu.addMenu(links_menu)
     action = links_menu.addAction("Export Media to Disk")
     action2 = links_menu.addAction("Download Missing Media")
@@ -191,11 +208,12 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
     qconnect(action4.triggered, upload_missing_media)
     qconnect(action5.triggered, create_deck_link)
     # Action is available; it will validate subscription before proceeding
-        
+
 
 def add_browser_menu_item(browser: Browser) -> None:
     if not auth_manager.is_logged_in():
         return
+
     def export_selected() -> None:
         config = mw.addonManager.getConfig(__name__)
         field = get_configured_search_field(config)
@@ -208,4 +226,3 @@ def add_browser_menu_item(browser: Browser) -> None:
     action = QAction("AnkiCollab: Export Media to Disk", browser)
     qconnect(action.triggered, export_selected)
     browser.form.menu_Notes.addAction(action)
-    
