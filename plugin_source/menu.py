@@ -1145,7 +1145,6 @@ def show_global_settings_dialog(parent_dialog):
 
     layout.addWidget(shortcuts_group)
 
-
     # Media and Statistics container
     media_stats_container = QWidget()
     media_stats_layout = QHBoxLayout(media_stats_container)
