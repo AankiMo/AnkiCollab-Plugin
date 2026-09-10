@@ -56,7 +56,6 @@ from .ui.colors import (
     get_table_style,
     get_groupbox_style,
     get_combobox_style,
-    get_info_box_style,
 )
 from anki.utils import point_version
 
@@ -982,7 +981,7 @@ def show_global_settings_dialog(parent_dialog):
         mw.addonManager.writeConfig(__name__, strings_data)
 
     # Subscription setting checkboxes
-    global_group = QGroupBox("Subscription Settings")
+    global_group = QGroupBox("Global Subscription Settings")
     global_group.setStyleSheet(get_groupbox_style())
     global_layout = QVBoxLayout(global_group)
 
@@ -1146,13 +1145,6 @@ def show_global_settings_dialog(parent_dialog):
 
     layout.addWidget(shortcuts_group)
 
-    # Subscription Info section
-    setting_info_label = QLabel(
-        "These settings apply globally to all your subscriptions. Changes take effect on the next import."
-    )
-    setting_info_label.setWordWrap(True)
-    setting_info_label.setStyleSheet(get_info_box_style())
-    layout.addWidget(setting_info_label)
 
     # Media and Statistics container
     media_stats_container = QWidget()
