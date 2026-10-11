@@ -26,12 +26,9 @@ from .media_manager import MediaManager  # Import List
 from .export_manager import *
 from .import_manager import *
 
-from .gear_menu_setup import (
-    add_browser_menu_item,
-    on_deck_browser_will_show_options_menu,
-)
-from .dialogs import AddChangelogDialog, ProtectFieldsDialog
-from .var_defs import API_BASE_URL, PREFIX_PROTECTED_FIELDS
+from .gear_menu_setup import add_browser_menu_item, on_deck_browser_will_show_options_menu
+from .dialogs import AddChangelogDialog, ProtectFieldsDialog, UpdateReminderDialog
+from .var_defs import PREFIX_PROTECTED_FIELDS
 
 from .auth_manager import auth_manager
 from .notifications_center import refresh_notifications, register_sync_refresh_hook
@@ -842,6 +839,74 @@ def patch_image_occlusion_enhanced():
     ioe_utils.get_image_dimensions = hk_get_image_dimensions  # type: ignore
     ioe_add.get_image_dimensions = hk_get_image_dimensions  # type: ignore
     return True
+    
+def _get_outdated_subscriptions() -> list:
+    """Return list of deck names whose local ts is older than 14 days and whose server timestamp is newer than the local timestamp."""
+
+    from datetime import datetime, timedelta, timezone
+    from .utils import DeckManager, get_local_deck_from_hash
+    from .api_client import api_client
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+    outdated = []
+
+    with DeckManager() as decks:
+        for deck_hash, details in decks:
+            # Skip decks that haven't been imported yet (no deckId or deckId=0)
+            if details.get("deckId", 0) == 0:
+                continue
+
+            local_ts = None   # Unix timestamp (float)
+            local_dt = None   # datetime object
+
+            ts_str = details.get("timestamp")
+            if ts_str:
+                try:
+                    local_dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                    local_ts = local_dt.timestamp()
+                except (ValueError, TypeError):
+                    continue # Skip if timestamp is malformed
+            
+            # If local timestamp is fresh (< 14 days old), skip server check entirely
+            if local_dt is not None and local_dt >= cutoff:
+                continue
+
+            # Local timestamp is outdated or missing → check server
+            try:
+                resp = api_client.get(f"/GetDeckTimestamp/{deck_hash}", timeout=15)
+                resp.raise_for_status()
+                server_ts = float(resp.text)
+            except Exception:
+                # Network error or server issue, skip to avoid false positives
+                continue
+
+
+            if local_ts is None or server_ts > local_ts:
+                deck_name = get_local_deck_from_hash(deck_hash)
+                if deck_name and deck_name != "None":
+                    outdated.append(deck_name)
+
+    return outdated
+
+
+def _show_update_reminder_if_needed():
+    """Check for outdated subscriptions and show the update reminder dialog if any are found."""
+    if not auth_manager.is_logged_in():
+        return
+
+    # Respect the opt-out setting (default: enabled)
+    config = mw.addonManager.getConfig(__name__) or {}
+    settings = config.get("settings", {}) if config else {}
+    if not settings.get("show_biweekly_update_reminder", True):
+        return
+
+    outdated = _get_outdated_subscriptions()
+    if not outdated:
+        return
+
+    dialog = UpdateReminderDialog(outdated, parent=mw)
+    if dialog.exec() and dialog.should_update():
+        async_update(silent=False)
 
 
 def onProfileLoaded():
@@ -854,6 +919,7 @@ def onProfileLoaded():
     main.media_manager.set_media_folder(mw.col.media.dir())
 
     autoUpdate()
+    _show_update_reminder_if_needed()
     refresh_notifications()
     patch_successful = patch_image_occlusion_enhanced()
     logger.info(f"Image Occlusion Enhanced patch: {patch_successful}")
