@@ -21,12 +21,14 @@ from utils import (
     get_deck_hash_from_card,
     get_deck_and_subdecks,
     create_backup,
+    get_noteids_from_uuids,
+    get_guids_from_noteids,
 )
-
 
 # ──────────────────────────────────────────────────────────────────────
 # Exception classes
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestExceptions:
     def test_collection_unavailable_is_exception(self):
@@ -46,6 +48,7 @@ class TestExceptions:
 # ──────────────────────────────────────────────────────────────────────
 # ensure_collection / is_collection_available / check_collection_or_abort
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestCollectionAvailability:
     def test_ensure_collection_success(self, mw_mock):
@@ -74,6 +77,7 @@ class TestCollectionAvailability:
 # ──────────────────────────────────────────────────────────────────────
 # DeckManager
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestDeckManager:
     @pytest.fixture
@@ -129,6 +133,7 @@ class TestDeckManager:
 # ──────────────────────────────────────────────────────────────────────
 # Lookup helpers
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestLookupHelpers:
     @pytest.fixture(autouse=True)
@@ -250,6 +255,7 @@ class TestGetDeckHashFromCard:
 # get_deck_and_subdecks
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestGetDeckAndSubdecks:
     def test_returns_empty_for_invalid_ids(self, mw_mock):
         assert get_deck_and_subdecks(None) == []
@@ -276,6 +282,7 @@ class TestGetDeckAndSubdecks:
 # get_logger
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestGetLogger:
     def test_returns_logger(self):
         lg = get_logger("test_module")
@@ -290,6 +297,7 @@ class TestGetLogger:
 # create_backup
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestCreateBackup:
     def test_raises_value_error_bg_and_critical(self, mw_mock):
         with pytest.raises(ValueError, match="Cannot use background"):
@@ -301,3 +309,32 @@ class TestCreateBackup:
     def test_critical_raises_when_no_collection(self, mw_no_col):
         with pytest.raises(BackupFailedError):
             create_backup(critical=True)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Note ID / GUID lookups
+# ──────────────────────────────────────────────────────────────────────
+
+
+class TestNoteIdLookups:
+    def test_get_noteids_empty_input(self, mw_mock):
+        assert get_noteids_from_uuids(None, []) == []
+
+    def test_get_noteids_no_collection(self, mw_no_col):
+        assert get_noteids_from_uuids(None, ["guid1"]) == []
+
+    def test_get_noteids_batch(self, mw_mock):
+        mw_mock.col.db.list.return_value = [100, 101]
+        result = get_noteids_from_uuids(None, ["g1", "g2"])
+        assert result == [100, 101]
+
+    def test_get_guids_empty_input(self, mw_mock):
+        assert get_guids_from_noteids(None, []) == []
+
+    def test_get_guids_no_collection(self, mw_no_col):
+        assert get_guids_from_noteids(None, [1, 2]) == []
+
+    def test_get_guids_batch(self, mw_mock):
+        mw_mock.col.db.list.return_value = ["g1", "g2"]
+        result = get_guids_from_noteids(None, [100, 101])
+        assert result == ["g1", "g2"]

@@ -11,21 +11,27 @@ import aqt.utils
 from contextlib import AbstractContextManager
 import logging
 
-from .var_defs import DEFAULT_PROTECTED_TAGS, PREFIX_PROTECTED_FIELDS, PREFIX_PROTECTED_TAGS
+from .var_defs import (
+    DEFAULT_PROTECTED_TAGS,
+    PREFIX_PROTECTED_FIELDS,
+    PREFIX_PROTECTED_TAGS,
+)
 
 
 class CollectionUnavailableError(Exception):
     """Raised when the Anki collection is not available."""
+
     pass
 
 
 class OperationAbortedError(Exception):
     """Raised when an operation is aborted due to collection becoming unavailable.
-    
+
     This exception is used to gracefully abort long-running import/export operations
     when the collection is closed mid-operation. It signals that the operation should
     stop immediately but data integrity is preserved.
     """
+
     def __init__(self, message: str = "Operation aborted", phase: str = "unknown"):
         self.phase = phase
         super().__init__(f"{message} (during {phase})")
@@ -33,20 +39,21 @@ class OperationAbortedError(Exception):
 
 class BackupFailedError(Exception):
     """Raised when a backup operation fails.
-    
+
     This exception indicates that the collection backup could not be created,
     which may indicate a problem with the collection. Operations should abort
     rather than proceed without a backup.
     """
+
     pass
 
 
 def ensure_collection() -> Collection:
     """Ensure the Anki collection is available and return it.
-    
+
     Raises:
         CollectionUnavailableError: If mw or mw.col is None.
-    
+
     Returns:
         The Anki collection object.
     """
@@ -60,7 +67,7 @@ def ensure_collection() -> Collection:
 
 def is_collection_available() -> bool:
     """Check if the Anki collection is currently available.
-    
+
     Returns:
         True if mw and mw.col are both available, False otherwise.
     """
@@ -69,23 +76,23 @@ def is_collection_available() -> bool:
 
 def check_collection_or_abort(phase: str = "unknown") -> Collection:
     """Check collection availability and abort gracefully if unavailable.
-    
+
     Use this function at key checkpoints during long-running operations to detect
     when the collection has been closed and abort gracefully without data loss.
-    
+
     Args:
         phase: Description of the current operation phase for error reporting.
-    
+
     Raises:
         OperationAbortedError: If the collection is not available.
-    
+
     Returns:
         The Anki collection object if available.
     """
     if mw is None or mw.col is None:
         raise OperationAbortedError(
             "Collection closed during operation - aborting to prevent data loss",
-            phase=phase
+            phase=phase,
         )
     return mw.col
 
@@ -140,7 +147,7 @@ def get_personal_tags(deck_hash):
                 combined_tags.add(PREFIX_PROTECTED_FIELDS)
                 combined_tags.add(PREFIX_PROTECTED_TAGS)
                 return list(combined_tags)
-    
+
     # Fallback: deck not found in config, use default protected tags
     # This ensures tags like "leech", "marked" are always stripped from exports
     return DEFAULT_PROTECTED_TAGS + [PREFIX_PROTECTED_FIELDS, PREFIX_PROTECTED_TAGS]
@@ -160,6 +167,8 @@ def get_logger(name: str = "ankicollab") -> logging.Logger:
     logger.propagate = False
     logger.setLevel(logging.INFO)
     return logger
+
+
 from typing import Dict, Iterator, Optional, Tuple
 
 
@@ -170,7 +179,7 @@ def get_timestamp(given_deck_hash):
     if details is not None:
 
         date_string = details["timestamp"]
-        datetime_obj = datetime.strptime(date_string, '%Y-%m-%d %H:%M:%S')
+        datetime_obj = datetime.strptime(date_string, "%Y-%m-%d %H:%M:%S")
         unix_timestamp = datetime_obj.timestamp()
         return unix_timestamp
 
@@ -200,7 +209,7 @@ def get_deck_hash_from_did(did):
 def get_deck_hash_from_card(card) -> Tuple[Optional[str], Optional[str]]:
     """
     Get the deck hash for a card, handling filtered decks via odid.
-    
+
     Returns:
         Tuple of (deck_hash, error_message).
         If successful, deck_hash is set and error_message is None.
@@ -211,17 +220,23 @@ def get_deck_hash_from_card(card) -> Tuple[Optional[str], Optional[str]]:
         did = card.odid
     else:
         did = card.did
-    
+
     # Check if the resolved deck is itself a filtered deck (edge case: odid=0 in filtered deck)
     deck_obj = mw.col.decks.get(did, default=False)
-    if deck_obj and deck_obj.get('dyn', False):
+    if deck_obj and deck_obj.get("dyn", False):
         # Card is in a filtered deck with no valid original deck
-        return None, "This card is in a filtered deck with no valid original deck. Cannot suggest changes."
-    
+        return (
+            None,
+            "This card is in a filtered deck with no valid original deck. Cannot suggest changes.",
+        )
+
     deck_hash = get_deck_hash_from_did(did)
     if deck_hash is None:
-        return None, "Cannot find the Cloud Deck for this card. Ensure the parent deck is subscribed."
-    
+        return (
+            None,
+            "Cannot find the Cloud Deck for this card. Ensure the parent deck is subscribed.",
+        )
+
     return deck_hash, None
 
 
@@ -247,25 +262,25 @@ def get_local_deck_from_id(deck_id):
 
 def create_backup(background: bool = False, critical: bool = False) -> bool:
     """Create a backup of the Anki collection.
-    
+
     Args:
         background: If True, run the backup operation in the background (non-blocking).
                    Cannot be used with critical=True.
         critical: If True, the backup is required for the operation to proceed.
                  Raises BackupFailedError if backup fails. Implies background=False.
-    
+
     Returns:
         True if backup succeeded, False if it was skipped or failed (when not critical).
-    
+
     Raises:
         BackupFailedError: If critical=True and the backup fails.
         ValueError: If both background=True and critical=True.
     """
     logger = get_logger("ankicollab.utils")
-    
+
     if background and critical:
         raise ValueError("Cannot use background=True with critical=True")
-    
+
     # Check collection availability before attempting backup
     if not is_collection_available():
         msg = "Cannot create backup: collection not available"
@@ -273,7 +288,7 @@ def create_backup(background: bool = False, critical: bool = False) -> bool:
         if critical:
             raise BackupFailedError(msg)
         return False
-    
+
     logger.info("Creating backup...")
 
     def do_backup_sync(col: Collection) -> bool:
@@ -303,10 +318,10 @@ def create_backup(background: bool = False, critical: bool = False) -> bool:
         if mw is None:
             logger.warning("Skipping background backup: main window not available")
             return False
-        
+
         def do_backup_bg(col: Collection):
             do_backup_sync(col)
-        
+
         QueryOp(
             parent=mw,
             op=do_backup_bg,
@@ -322,15 +337,15 @@ def create_backup(background: bool = False, critical: bool = False) -> bool:
             if critical:
                 raise BackupFailedError(msg)
             return False
-        
+
         success = do_backup_sync(col)
-        
+
         if not success and critical:
             raise BackupFailedError(
                 "Failed to create backup. The operation has been aborted to protect your data. "
                 "Please check that your collection is not corrupted and try again."
             )
-        
+
         return success
 
 
@@ -341,7 +356,7 @@ class DeckManager(AbstractContextManager):
         self._filtered_items = {
             deck_hash: details
             for deck_hash, details in self._raw_data.items()
-            if deck_hash not in ['settings', 'auth']
+            if deck_hash not in ["settings", "auth"]
         }
 
     def __enter__(self) -> DeckManager:
@@ -372,3 +387,61 @@ def get_deck_and_subdecks(deck_id):
     except Exception as e:
         return deck_ids
     return deck_ids
+
+
+def get_noteids_from_uuids(logger, guids):
+    """Get note IDs from GUIDs using prepared statements for better performance."""
+    if not mw.col or not guids:
+        return []
+
+    noteids = []
+    try:
+        batch_size = 1000
+        for i in range(0, len(guids), batch_size):
+            batch = guids[i : i + batch_size]
+            placeholders = ",".join(["?" for _ in batch])
+            query = f"SELECT id FROM notes WHERE guid IN ({placeholders})"
+            noteids.extend(mw.col.db.list(query, *batch))  # type: ignore
+    except Exception as e:
+        logger.error(
+            f"Error getting note IDs from GUIDs using prepared statements: {e}"
+        )
+        for guid in guids:
+            try:
+                note_id = mw.col.db.scalar("SELECT id FROM notes WHERE guid = ?", guid)  # type: ignore
+                if note_id:
+                    noteids.append(note_id)
+            except Exception as e2:
+                logger.error(f"Error getting note ID for GUID {guid}: {e2}")
+    return noteids
+
+
+def get_guids_from_noteids(logger, nids):
+    """Get GUIDs from note IDs using prepared statements for better performance."""
+    if not mw.col or not nids:
+        return []
+    database = mw.col.db
+    if not database:
+        return []
+
+    guids = []
+    try:
+        batch_size = 1000
+        for i in range(0, len(nids), batch_size):
+            batch = nids[i : i + batch_size]
+            placeholders = ",".join(["?" for _ in batch])
+            query = f"SELECT guid FROM notes WHERE id IN ({placeholders})"
+            guids.extend(database.list(query, *batch))
+    except Exception as e:
+        logger.error(
+            f"Error getting GUIDs from note IDs using prepared statements: {e}"
+        )
+        query = "SELECT guid FROM notes WHERE id = ?"
+        for nid in nids:
+            try:
+                guid = database.scalar(query, nid)
+                if guid:
+                    guids.append(guid)
+            except Exception as e2:
+                logger.error(f"Error getting GUID for note ID {nid}: {e2}")
+    return guids

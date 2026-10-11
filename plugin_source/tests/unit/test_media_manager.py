@@ -27,10 +27,10 @@ from media_manager import (
     CONTENT_TYPE_MAP,
 )
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Exception hierarchy
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestExceptionHierarchy:
     def test_media_error_is_base(self):
@@ -42,8 +42,15 @@ class TestExceptionHierarchy:
         assert issubclass(MediaDownloadError, MediaError)
 
     def test_all_are_exceptions(self):
-        for cls in (MediaError, MediaServerError, MediaRateLimitError,
-                    MediaTypeError, MediaHashError, MediaUploadError, MediaDownloadError):
+        for cls in (
+            MediaError,
+            MediaServerError,
+            MediaRateLimitError,
+            MediaTypeError,
+            MediaHashError,
+            MediaUploadError,
+            MediaDownloadError,
+        ):
             assert issubclass(cls, Exception)
 
 
@@ -51,11 +58,18 @@ class TestExceptionHierarchy:
 # Constants
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestMediaConstants:
     def test_max_file_size(self):
         assert MAX_FILE_SIZE == 10 * 1024 * 1024
 
-    def test_upload_concurrency(self):
+    def test_upload_concurrency(self, tmp_media_dir, mw_mock):
+        """UPLOAD_CONCURRENCY drives the media-upload semaphore size — assert
+        the behavior it controls, not just that the constant is positive."""
+        mm = MediaManager(
+            api_base_url="http://test.local", media_folder=str(tmp_media_dir)
+        )
+        assert mm.upload_semaphore_size == UPLOAD_CONCURRENCY
         assert UPLOAD_CONCURRENCY > 0
 
     def test_allowed_extensions_contain_common_formats(self):
@@ -67,12 +81,15 @@ class TestMediaConstants:
         # .oga is in ALLOWED_EXTENSIONS but intentionally absent from
         # CONTENT_TYPE_MAP — document as known gap rather than failing.
         missing = ALL_ALLOWED_EXTENSIONS - set(CONTENT_TYPE_MAP.keys())
-        assert missing <= {".oga"}, f"Unexpected missing content types: {missing - {'.oga'}}"
+        assert missing <= {
+            ".oga"
+        }, f"Unexpected missing content types: {missing - {'.oga'}}"
 
 
 # ──────────────────────────────────────────────────────────────────────
 # RateLimiter
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestRateLimiter:
     def test_init_positive_values(self):
@@ -115,6 +132,7 @@ class TestRateLimiter:
 # ──────────────────────────────────────────────────────────────────────
 # retry decorator
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestRetryDecorator:
     @pytest.mark.asyncio
@@ -209,14 +227,19 @@ class TestRetryDecorator:
 # MediaManager — construction & helpers
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestMediaManagerInit:
     def test_init_with_valid_folder(self, tmp_media_dir, mw_mock):
-        mm = MediaManager(api_base_url="http://test.local", media_folder=str(tmp_media_dir))
+        mm = MediaManager(
+            api_base_url="http://test.local", media_folder=str(tmp_media_dir)
+        )
         assert mm.api_base_url == "http://test.local"
         assert mm.media_folder == tmp_media_dir
 
     def test_init_strips_trailing_slash(self, tmp_media_dir, mw_mock):
-        mm = MediaManager(api_base_url="http://test.local/", media_folder=str(tmp_media_dir))
+        mm = MediaManager(
+            api_base_url="http://test.local/", media_folder=str(tmp_media_dir)
+        )
         assert mm.api_base_url == "http://test.local"
 
     def test_init_invalid_folder(self, mw_mock):
@@ -227,7 +250,9 @@ class TestMediaManagerInit:
 class TestMediaManagerHelpers:
     @pytest.fixture
     def mm(self, tmp_media_dir, mw_mock):
-        return MediaManager(api_base_url="http://test.local", media_folder=str(tmp_media_dir))
+        return MediaManager(
+            api_base_url="http://test.local", media_folder=str(tmp_media_dir)
+        )
 
     def test_file_exists_with_size_true(self, mm, tmp_media_dir):
         assert mm._file_exists_with_size(tmp_media_dir / "test_image.png") is True
@@ -271,10 +296,13 @@ class TestMediaManagerHelpers:
 # Path traversal protection in download_file
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestDownloadFilePathTraversal:
     @pytest.fixture
     def mm(self, tmp_media_dir, mw_mock):
-        return MediaManager(api_base_url="http://test.local", media_folder=str(tmp_media_dir))
+        return MediaManager(
+            api_base_url="http://test.local", media_folder=str(tmp_media_dir)
+        )
 
     @pytest.mark.asyncio
     async def test_blocks_parent_directory_traversal(self, mm, tmp_media_dir):

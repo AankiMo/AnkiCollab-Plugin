@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import sentry_sdk
 
 from .utils import get_logger
+
 LOGGER = get_logger("ankicollab.sentry")
 
 # Anki
@@ -85,7 +86,20 @@ def _sanitize_media_value(key: str, value: Any) -> Any:
             return _hash_identifier(item)
         return "[filtered]"
 
-    if any(token in key_lower for token in ("filename", "filepath", "filenames", "file_name", "destination", "source", "path", "directory", "dir")):
+    if any(
+        token in key_lower
+        for token in (
+            "filename",
+            "filepath",
+            "filenames",
+            "file_name",
+            "destination",
+            "source",
+            "path",
+            "directory",
+            "dir",
+        )
+    ):
         if isinstance(value, (list, tuple, set)):
             return [_apply(v) for v in value]
         return _apply(value)
@@ -121,7 +135,9 @@ def _prepare_media_context(context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return prepared
 
 
-def _set_scope_metadata(scope: "sentry_sdk.Scope", context: Dict[str, Any], tags: Optional[Dict[str, Any]]) -> None:
+def _set_scope_metadata(
+    scope: "sentry_sdk.Scope", context: Dict[str, Any], tags: Optional[Dict[str, Any]]
+) -> None:
     for key, value in context.items():
         try:
             scope.set_extra(key, value)
@@ -238,7 +254,14 @@ def _before_send_factory(addon_root: str):
                 for ctx_key in list(ctx.keys()):
                     ctx_val = ctx.get(ctx_key)
                     if isinstance(ctx_val, dict):
-                        for ip_key in ("REMOTE_ADDR", "remote_addr", "remote_ip", "client_ip", "ip", "ip_address"):
+                        for ip_key in (
+                            "REMOTE_ADDR",
+                            "remote_addr",
+                            "remote_ip",
+                            "client_ip",
+                            "ip",
+                            "ip_address",
+                        ):
                             ctx_val.pop(ip_key, None)
             except Exception:
                 pass
@@ -308,8 +331,12 @@ def init_sentry() -> None:
 
     # Smoke test: log vendored SDK version and whether we think it's obsolete
     try:
-        ver = getattr(sentry_sdk, "__version__", None) or getattr(sentry_sdk, "VERSION", "unknown")
-        LOGGER.info(f"sentry-sdk version: {ver}; obsolete={obsolete_version_of_sentry_sdk()}")
+        ver = getattr(sentry_sdk, "__version__", None) or getattr(
+            sentry_sdk, "VERSION", "unknown"
+        )
+        LOGGER.info(
+            f"sentry-sdk version: {ver}; obsolete={obsolete_version_of_sentry_sdk()}"
+        )
     except Exception:
         LOGGER.info("sentry-sdk version: unknown")
 
@@ -364,19 +391,25 @@ def init_sentry() -> None:
         try:
             import anki  # type: ignore
 
-            anki_version = getattr(anki, "version", None) or getattr(aqt, "appVersion", "unknown")
+            anki_version = getattr(anki, "version", None) or getattr(
+                aqt, "appVersion", "unknown"
+            )
         except Exception:
             anki_version = getattr(aqt, "appVersion", "unknown") if aqt else "unknown"
 
         with sentry_sdk.configure_scope() as scope:  # type: ignore[attr-defined]
             scope.set_tag("addon", "ankicollab")
-            scope.set_tag("python", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+            scope.set_tag(
+                "python",
+                f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            )
             scope.set_tag("platform", platform.platform())
             scope.set_tag("anki_version", anki_version)
     except Exception as e:
         # Never let Sentry break the add-on
         LOGGER.warning(f"Sentry init skipped: {e}")
         return
+
 
 def _parse_version_tuple(ver: str) -> tuple[int, int, int]:
     parts = [p for p in ver.split(".") if p.isdigit()]
@@ -394,7 +427,9 @@ def obsolete_version_of_sentry_sdk() -> bool:
     Mirrors HyperTTS’ precaution but stays minimal.
     """
     try:
-        ver = getattr(sentry_sdk, "__version__", None) or getattr(sentry_sdk, "VERSION", "0.0.0")
+        ver = getattr(sentry_sdk, "__version__", None) or getattr(
+            sentry_sdk, "VERSION", "0.0.0"
+        )
         return _parse_version_tuple(str(ver)) < (1, 5, 5)
     except Exception:
         return False
@@ -415,12 +450,14 @@ def is_sentry_enabled() -> bool:
         # SDK presence
         try:
             from sentry_sdk import Hub  # type: ignore
+
             return Hub.current.client is not None
         except Exception:
             return False
     except Exception as e:
         LOGGER.debug(f"Sentry status check failed: {e}")
         return False
+
 
 def get_sentry_status() -> Tuple[bool, str]:
     """Return (enabled, reason) for UI diagnostics.
@@ -436,7 +473,11 @@ def get_sentry_status() -> Tuple[bool, str]:
             return False, "Opt-out via settings"
         try:
             from sentry_sdk import Hub  # type: ignore
-            return (Hub.current.client is not None, "Enabled" if Hub.current.client else "Not initialized")
+
+            return (
+                Hub.current.client is not None,
+                "Enabled" if Hub.current.client else "Not initialized",
+            )
         except Exception:
             return False, "SDK not available"
     except Exception as e:

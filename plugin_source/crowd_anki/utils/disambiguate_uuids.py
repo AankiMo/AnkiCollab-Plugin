@@ -2,6 +2,7 @@ from uuid import uuid1
 
 from .notifier import AnkiModalNotifier
 
+
 def disambiguate_note_model_uuids(collection, notifier=None) -> None:
     """Disambiguate duplicate note model UUIDs.
 
@@ -23,8 +24,10 @@ def disambiguate_note_model_uuids(collection, notifier=None) -> None:
         notifier = AnkiModalNotifier()
     uuids = []
     full_message = ""
-    for model in filter(lambda model: "crowdanki_uuid" in model,
-                        sorted(collection.models.all(), key=lambda m: m["id"])):
+    for model in filter(
+        lambda model: "crowdanki_uuid" in model,
+        sorted(collection.models.all(), key=lambda m: m["id"]),
+    ):
         # We're sorting by note model id, because it almost always
         # (see the discussion in the PR for this addition) corresponds
         # to the time of creation of the note model, in milliseconds
@@ -36,8 +39,10 @@ def disambiguate_note_model_uuids(collection, notifier=None) -> None:
             new_crowdanki_uuid = str(uuid1())
             model["crowdanki_uuid"] = new_crowdanki_uuid
             collection.models.save(model)
-            message = (f"Replacing duplicate UUID ({crowdanki_uuid}) for note model "
-                       f"“{model['name']}” with new UUID ({new_crowdanki_uuid})!\n")
+            message = (
+                f"Replacing duplicate UUID ({crowdanki_uuid}) for note model "
+                f"“{model['name']}” with new UUID ({new_crowdanki_uuid})!\n"
+            )
             # Printing in the unlikely case there's a crash later in
             # the loop.
             print(message)

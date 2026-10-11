@@ -4,6 +4,7 @@ import os
 from pprint import pprint
 from sqlite3 import OperationalError
 
+
 def merge_dicts(*dict_args):
     """
     Given any number of dicts, shallow copy and merge into a new dict,
@@ -15,9 +16,13 @@ def merge_dicts(*dict_args):
     return result
 
 
-def add_column(db, table_name, column_name, default_value="\"\""):
+def add_column(db, table_name, column_name, default_value='""'):
     try:
-        db.execute('ALTER TABLE {} ADD COLUMN {} TEXT DEFAULT {};'.format(table_name, column_name, default_value))
+        db.execute(
+            "ALTER TABLE {} ADD COLUMN {} TEXT DEFAULT {};".format(
+                table_name, column_name, default_value
+            )
+        )
     except OperationalError as e:
         # The point is to ignore error if there is already the column
         pprint(e)
@@ -31,7 +36,11 @@ def add_absent_field(object_to_modify, field_name, default_value=None):
     :param default_value:
     :return:
     """
-    setattr(object_to_modify, field_name, getattr(object_to_modify, field_name, default_value))
+    setattr(
+        object_to_modify,
+        field_name,
+        getattr(object_to_modify, field_name, default_value),
+    )
 
 
 def json_compare(first, second):
@@ -58,8 +67,8 @@ def fs_remove(path):
 
 
 def list_to_cs_string(uf_list: list) -> str:
-    return ', '.join(uf_list)
+    return ", ".join(uf_list)
 
 
 def string_cs_to_list(f_list: str) -> list:
-    return [x.strip() for x in f_list.split(',')] if f_list else []
+    return [x.strip() for x in f_list.split(",")] if f_list else []

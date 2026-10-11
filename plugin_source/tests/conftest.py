@@ -23,6 +23,7 @@ ADDON_PACKAGE = ADDON_ROOT.name
 # Helpers for building Anki data structures
 # ---------------------------------------------------------------------------
 
+
 def make_notetype(
     name="Basic",
     fields=None,
@@ -36,8 +37,12 @@ def make_notetype(
         fields = ["Front", "Back"]
     if templates is None:
         templates = [
-            {"name": "Card 1", "qfmt": "{{Front}}",
-             "afmt": "{{FrontSide}}<hr id=answer>{{Back}}", "ord": 0}
+            {
+                "name": "Card 1",
+                "qfmt": "{{Front}}",
+                "afmt": "{{FrontSide}}<hr id=answer>{{Back}}",
+                "ord": 0,
+            }
         ]
     if model_uuid is None:
         model_uuid = str(uuid_mod.uuid4())
@@ -46,8 +51,14 @@ def make_notetype(
         "id": model_id,
         "name": name,
         "flds": [
-            {"name": f, "ord": i, "sticky": False, "rtl": False,
-             "font": "Arial", "size": 20}
+            {
+                "name": f,
+                "ord": i,
+                "sticky": False,
+                "rtl": False,
+                "font": "Arial",
+                "size": 20,
+            }
             for i, f in enumerate(fields)
         ],
         "tmpls": templates,
@@ -113,8 +124,10 @@ def make_deck_json(
 # Mock Anki Note that works with the addon's Note class
 # ---------------------------------------------------------------------------
 
+
 class MockAnkiNote:
     """A mock AnkiNote suitable for addon Note wrapper testing."""
+
     def __init__(self, collection=None, id=None, model=None, **kwargs):
         self.id = id or 0
         self.mid = model.get("id", 0) if isinstance(model, dict) else (model or 0)
@@ -142,6 +155,7 @@ class MockAnkiNote:
 # Mock Collection with model/deck stores
 # ---------------------------------------------------------------------------
 
+
 def create_mock_collection(media_dir=""):
     """Build a mock collection with working model/deck stores."""
     col = MagicMock()
@@ -154,7 +168,9 @@ def create_mock_collection(media_dir=""):
     all_models = {}
 
     def models_get(model_id):
-        return copy.deepcopy(all_models.get(int(model_id) if not isinstance(model_id, int) else model_id))
+        return copy.deepcopy(
+            all_models.get(int(model_id) if not isinstance(model_id, int) else model_id)
+        )
 
     def models_all():
         return [copy.deepcopy(m) for m in all_models.values()]
@@ -178,8 +194,14 @@ def create_mock_collection(media_dir=""):
         return None
 
     def models_new(name):
-        return {"id": 0, "name": name, "flds": [], "tmpls": [], "css": "",
-                "crowdanki_uuid": ""}
+        return {
+            "id": 0,
+            "name": name,
+            "flds": [],
+            "tmpls": [],
+            "css": "",
+            "crowdanki_uuid": "",
+        }
 
     col.models.get = MagicMock(side_effect=models_get)
     col.models.all = MagicMock(side_effect=models_all)
@@ -225,8 +247,11 @@ def create_mock_collection(media_dir=""):
 
     def decks_children(did):
         parent = all_decks.get(did, {}).get("name", "")
-        return [(d["name"], d["id"]) for d in all_decks.values()
-                if d["name"].startswith(parent + "::") and d["id"] != did]
+        return [
+            (d["name"], d["id"])
+            for d in all_decks.values()
+            if d["name"].startswith(parent + "::") and d["id"] != did
+        ]
 
     def decks_card_count(did, include_subdecks=False):
         return 0
@@ -249,9 +274,11 @@ def create_mock_collection(media_dir=""):
     col.decks.is_filtered = MagicMock(return_value=False)
     col.decks.all_config = MagicMock(return_value=[])
     col.decks.get_config = MagicMock(
-        return_value={"id": 1, "name": "Default", "crowdanki_uuid": "cfg-uuid-001"})
+        return_value={"id": 1, "name": "Default", "crowdanki_uuid": "cfg-uuid-001"}
+    )
     col.decks.add_config = MagicMock(
-        return_value={"id": 2, "name": "New Config", "crowdanki_uuid": ""})
+        return_value={"id": 2, "name": "New Config", "crowdanki_uuid": ""}
+    )
     col.decks.update_config = MagicMock()
     col.decks._store = all_decks
 
@@ -278,6 +305,7 @@ def create_mock_collection(media_dir=""):
 # ---------------------------------------------------------------------------
 # Shared Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def tmp_media_dir(tmp_path):
@@ -323,8 +351,10 @@ def mock_collection(tmp_path):
 def basic_notetype():
     """Simple Basic notetype dict."""
     return make_notetype(
-        name="Basic", fields=["Front", "Back"],
-        model_id=1000, model_uuid="basic-model-uuid-001",
+        name="Basic",
+        fields=["Front", "Back"],
+        model_id=1000,
+        model_uuid="basic-model-uuid-001",
     )
 
 
@@ -332,10 +362,18 @@ def basic_notetype():
 def cloze_notetype():
     """Cloze notetype dict."""
     return make_notetype(
-        name="Cloze", fields=["Text", "Extra"],
-        templates=[{"name": "Cloze", "qfmt": "{{cloze:Text}}",
-                     "afmt": "{{cloze:Text}}<br>{{Extra}}", "ord": 0}],
-        model_id=1001, model_uuid="cloze-model-uuid-001",
+        name="Cloze",
+        fields=["Text", "Extra"],
+        templates=[
+            {
+                "name": "Cloze",
+                "qfmt": "{{cloze:Text}}",
+                "afmt": "{{cloze:Text}}<br>{{Extra}}",
+                "ord": 0,
+            }
+        ],
+        model_id=1001,
+        model_uuid="cloze-model-uuid-001",
     )
 
 
@@ -344,15 +382,31 @@ def complex_notetype():
     """Complex notetype with many fields for edge case testing."""
     return make_notetype(
         name="Complex Medical",
-        fields=["Term", "Definition", "Extra Info", "Image", "Audio",
-                "Tags Field", "Source"],
-        templates=[
-            {"name": "Card 1", "qfmt": "{{Term}}",
-             "afmt": "{{Term}}<hr>{{Definition}}<br>{{Extra Info}}", "ord": 0},
-            {"name": "Card 2", "qfmt": "{{Definition}}",
-             "afmt": "{{Definition}}<hr>{{Term}}", "ord": 1},
+        fields=[
+            "Term",
+            "Definition",
+            "Extra Info",
+            "Image",
+            "Audio",
+            "Tags Field",
+            "Source",
         ],
-        model_id=1002, model_uuid="complex-model-uuid-001",
+        templates=[
+            {
+                "name": "Card 1",
+                "qfmt": "{{Term}}",
+                "afmt": "{{Term}}<hr>{{Definition}}<br>{{Extra Info}}",
+                "ord": 0,
+            },
+            {
+                "name": "Card 2",
+                "qfmt": "{{Definition}}",
+                "afmt": "{{Definition}}<hr>{{Term}}",
+                "ord": 1,
+            },
+        ],
+        model_id=1002,
+        model_uuid="complex-model-uuid-001",
     )
 
 
@@ -360,8 +414,10 @@ def complex_notetype():
 def projektanki_notetype():
     """ProjektAnki notetype whose templates should be preserved."""
     return make_notetype(
-        name="ProjektAnki Basic", fields=["Front", "Back", "Hint"],
-        model_id=1003, model_uuid="projektanki-model-uuid-001",
+        name="ProjektAnki Basic",
+        fields=["Front", "Back", "Hint"],
+        model_id=1003,
+        model_uuid="projektanki-model-uuid-001",
     )
 
 

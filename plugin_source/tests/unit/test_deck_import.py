@@ -8,14 +8,18 @@ These verify the critical paths in deck import:
 - Deck name collision handling
 - Metadata loading from JSON
 """
+
 import copy
 import pytest
 from unittest.mock import MagicMock, patch, call
 from collections import namedtuple
 
 from tests.conftest import (
-    make_notetype, make_note_dict, make_deck_json,
-    create_mock_collection, MockAnkiNote,
+    make_notetype,
+    make_note_dict,
+    make_deck_json,
+    create_mock_collection,
+    MockAnkiNote,
 )
 
 from crowd_anki.representation.deck import Deck, DeckMetadata
@@ -25,17 +29,19 @@ from crowd_anki.representation.deck_config import DeckConfig
 from crowd_anki.representation import deck_initializer
 from crowd_anki.utils.constants import UUID_FIELD_NAME
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Deck from JSON (deck_initializer.from_json)
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestDeckFromJson:
     def test_simple_deck_loads(self):
-        nt = make_notetype(name="Basic", fields=["Front", "Back"],
-                           model_uuid="model-001")
-        note = make_note_dict(guid="note1", fields=["f", "b"],
-                              note_model_uuid="model-001")
+        nt = make_notetype(
+            name="Basic", fields=["Front", "Back"], model_uuid="model-001"
+        )
+        note = make_note_dict(
+            guid="note1", fields=["f", "b"], note_model_uuid="model-001"
+        )
         deck_json = make_deck_json(
             name="TestDeck",
             notes=[note],
@@ -63,8 +69,10 @@ class TestDeckFromJson:
 
     def test_nested_children(self):
         nt = make_notetype(name="Basic", model_uuid="m-001")
-        grandchild = make_deck_json(name="GrandChild",
-                                     notes=[make_note_dict(guid="gc1", note_model_uuid="m-001")])
+        grandchild = make_deck_json(
+            name="GrandChild",
+            notes=[make_note_dict(guid="gc1", note_model_uuid="m-001")],
+        )
         child = make_deck_json(name="Child", children=[grandchild])
         parent = make_deck_json(name="Top", note_models=[nt], children=[child])
         deck = deck_initializer.from_json(parent)
@@ -84,8 +92,7 @@ class TestDeckFromJson:
         nt1 = make_notetype(name="Type1", model_uuid="m-001", model_id=1)
         nt2 = make_notetype(name="Type2", model_uuid="m-002", model_id=2)
         child = make_deck_json(name="Child", note_models=[nt2])
-        parent = make_deck_json(name="Parent", note_models=[nt1],
-                                 children=[child])
+        parent = make_deck_json(name="Parent", note_models=[nt1], children=[child])
         deck = deck_initializer.from_json(parent)
         assert "m-001" in deck.metadata.models
         assert "m-002" in deck.metadata.models
@@ -100,12 +107,15 @@ class TestDeckFromJson:
         nt = make_notetype(name="Basic", model_uuid="m-001")
         child = make_deck_json(
             name="Child",
-            notes=[make_note_dict(guid=f"c{i}", note_model_uuid="m-001")
-                   for i in range(3)])
+            notes=[
+                make_note_dict(guid=f"c{i}", note_model_uuid="m-001") for i in range(3)
+            ],
+        )
         parent = make_deck_json(
             name="Parent",
-            notes=[make_note_dict(guid=f"p{i}", note_model_uuid="m-001")
-                   for i in range(2)],
+            notes=[
+                make_note_dict(guid=f"p{i}", note_model_uuid="m-001") for i in range(2)
+            ],
             children=[child],
             note_models=[nt],
         )
@@ -117,10 +127,14 @@ class TestDeckFromJson:
 # Deck name hierarchy
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestDeckNameHierarchy:
     def _make_deck(self, name, home_deck=None, is_child=False):
-        deck = Deck(MagicMock(), {"name": name, "crowdanki_uuid": "x", "id": 1},
-                    is_child=is_child)
+        deck = Deck(
+            MagicMock(),
+            {"name": name, "crowdanki_uuid": "x", "id": 1},
+            is_child=is_child,
+        )
         return deck
 
     def test_get_full_deck_name_root_with_home_deck(self):
@@ -148,11 +162,13 @@ class TestDeckNameHierarchy:
 # Note collection / mapping
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestNoteCollection:
     def test_collect_all_notes_flat(self):
         nt = make_notetype(name="Basic", model_uuid="m-001")
-        notes = [make_note_dict(guid=f"n{i}", note_model_uuid="m-001")
-                 for i in range(3)]
+        notes = [
+            make_note_dict(guid=f"n{i}", note_model_uuid="m-001") for i in range(3)
+        ]
         deck_json = make_deck_json(name="Flat", notes=notes, note_models=[nt])
         deck = deck_initializer.from_json(deck_json)
 
@@ -165,8 +181,9 @@ class TestNoteCollection:
 
     def test_collect_all_notes_with_children(self):
         nt = make_notetype(name="Basic", model_uuid="m-001")
-        child_notes = [make_note_dict(guid=f"cn{i}", note_model_uuid="m-001")
-                       for i in range(2)]
+        child_notes = [
+            make_note_dict(guid=f"cn{i}", note_model_uuid="m-001") for i in range(2)
+        ]
         child_json = make_deck_json(name="Child", notes=child_notes)
         parent_json = make_deck_json(
             name="Parent",
@@ -188,8 +205,9 @@ class TestNoteCollection:
 
     def test_deep_nesting_mapping(self):
         nt = make_notetype(name="Basic", model_uuid="m-001")
-        gc = make_deck_json(name="GC",
-            notes=[make_note_dict(guid="gcn", note_model_uuid="m-001")])
+        gc = make_deck_json(
+            name="GC", notes=[make_note_dict(guid="gcn", note_model_uuid="m-001")]
+        )
         child = make_deck_json(name="Child", children=[gc])
         root = make_deck_json(name="Root", children=[child], note_models=[nt])
         deck = deck_initializer.from_json(root)
@@ -203,6 +221,7 @@ class TestNoteCollection:
 # ──────────────────────────────────────────────────────────────────────
 # Deck structure creation
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestDeckStructureCreation:
     def test_create_root_deck(self):
@@ -221,8 +240,7 @@ class TestDeckStructureCreation:
         col = create_mock_collection()
         nt = make_notetype(name="Basic", model_uuid="m-001")
         child = make_deck_json(name="SubA")
-        deck_json = make_deck_json(name="Root", children=[child],
-                                    note_models=[nt])
+        deck_json = make_deck_json(name="Root", children=[child], note_models=[nt])
         deck = deck_initializer.from_json(deck_json)
         deck.collection = col
 
@@ -235,6 +253,7 @@ class TestDeckStructureCreation:
 # Deck rename on conflict
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestDeckRename:
     def test_rename_appends_ankicollab(self):
         col = create_mock_collection()
@@ -246,8 +265,11 @@ class TestDeckRename:
     def test_rename_increments_on_further_conflict(self):
         col = create_mock_collection()
         col.decks._store[1] = {"id": 1, "name": "Existing", "crowdanki_uuid": "old"}
-        col.decks._store[2] = {"id": 2, "name": "Existing (AnkiCollab)",
-                                "crowdanki_uuid": "old2"}
+        col.decks._store[2] = {
+            "id": 2,
+            "name": "Existing (AnkiCollab)",
+            "crowdanki_uuid": "old2",
+        }
         new_name = Deck._rename_deck("Existing", col)
         assert new_name.startswith("Existing (AnkiCollab)")
         assert new_name != "Existing (AnkiCollab)"
@@ -256,6 +278,7 @@ class TestDeckRename:
 # ──────────────────────────────────────────────────────────────────────
 # Notetype handling during import
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestNotetypeHandling:
     def test_are_notetypes_compatible_identical(self):
@@ -278,8 +301,7 @@ class TestNotetypeHandling:
     def test_check_fields_compatible_superset(self):
         """Local notetype with extra fields is compatible (user added custom fields)."""
         nt_remote = make_notetype(name="ProjektAnki Test", fields=["A", "B"])
-        nt_local = make_notetype(name="ProjektAnki Test",
-                                  fields=["A", "B", "MyCustom"])
+        nt_local = make_notetype(name="ProjektAnki Test", fields=["A", "B", "MyCustom"])
 
         deck = Deck(MagicMock(), {"name": "D", "crowdanki_uuid": "x", "id": 1})
         assert deck._check_fields_compatible(nt_remote, nt_local) is True
@@ -296,6 +318,7 @@ class TestNotetypeHandling:
 # ──────────────────────────────────────────────────────────────────────
 # Risk assessment for notetype changes
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestChangeRiskAssessment:
     def test_no_risk_identical(self):
@@ -321,6 +344,7 @@ class TestChangeRiskAssessment:
 # Metadata loading
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestMetadataLoading:
     def test_load_metadata_from_json_no_configs(self):
         nt = make_notetype(name="Basic", model_uuid="m-001")
@@ -336,8 +360,9 @@ class TestMetadataLoading:
             "name": "MyConfig",
             "crowdanki_uuid": "cfg-001",
         }
-        deck_json = make_deck_json(name="Test", note_models=[nt],
-                                    deck_configurations=[config])
+        deck_json = make_deck_json(
+            name="Test", note_models=[nt], deck_configurations=[config]
+        )
         deck = deck_initializer.from_json(deck_json)
         assert len(deck.metadata.deck_configs) == 1
 
@@ -346,20 +371,24 @@ class TestMetadataLoading:
 # Deck flatten (for export)
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestDeckFlatten:
     def test_child_deck_uses_leaf_name(self):
-        deck = Deck(MagicMock(),
-                    {"name": "Parent::Child::Grandchild",
-                     "crowdanki_uuid": "x", "id": 1},
-                    is_child=True)
+        deck = Deck(
+            MagicMock(),
+            {"name": "Parent::Child::Grandchild", "crowdanki_uuid": "x", "id": 1},
+            is_child=True,
+        )
         deck.metadata = DeckMetadata(models={}, deck_configs={})
         result = deck.flatten()
         assert result["name"] == "Grandchild"
 
     def test_root_deck_uses_full_name(self):
-        deck = Deck(MagicMock(),
-                    {"name": "TopLevel", "crowdanki_uuid": "x", "id": 1},
-                    is_child=False)
+        deck = Deck(
+            MagicMock(),
+            {"name": "TopLevel", "crowdanki_uuid": "x", "id": 1},
+            is_child=False,
+        )
         # flatten() accesses metadata, so set a minimal DeckMetadata
         deck.metadata = DeckMetadata(models={}, deck_configs={})
         result = deck.flatten()
@@ -370,11 +399,15 @@ class TestDeckFlatten:
 # Temp deck cleanup
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestTempDeckCleanup:
     def test_cleanup_empty_temp_deck(self):
         col = create_mock_collection()
-        col.decks._store[99] = {"id": 99, "name": "_ankicollab_import_abc",
-                                 "crowdanki_uuid": ""}
+        col.decks._store[99] = {
+            "id": 99,
+            "name": "_ankicollab_import_abc",
+            "crowdanki_uuid": "",
+        }
 
         deck = Deck(MagicMock(), {"name": "D", "crowdanki_uuid": "x", "id": 1})
         deck.collection = col
@@ -390,8 +423,11 @@ class TestTempDeckCleanup:
 
     def test_cleanup_deck_with_cards_not_deleted(self):
         col = create_mock_collection()
-        col.decks._store[99] = {"id": 99, "name": "_ankicollab_import_abc",
-                                 "crowdanki_uuid": ""}
+        col.decks._store[99] = {
+            "id": 99,
+            "name": "_ankicollab_import_abc",
+            "crowdanki_uuid": "",
+        }
         col.decks.card_count = MagicMock(return_value=5)
 
         deck = Deck(MagicMock(), {"name": "D", "crowdanki_uuid": "x", "id": 1})
@@ -401,18 +437,20 @@ class TestTempDeckCleanup:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Deck initializer helpers  
+# Deck initializer helpers
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestDeckInitializerHelpers:
     def test_remove_unchanged_notes(self):
         nt = make_notetype(name="Basic", model_uuid="m-001")
-        notes = [make_note_dict(guid=f"n{i}", note_model_uuid="m-001")
-                 for i in range(3)]
+        notes = [
+            make_note_dict(guid=f"n{i}", note_model_uuid="m-001") for i in range(3)
+        ]
         deck_json = make_deck_json(name="Test", notes=notes, note_models=[nt])
         deck = deck_initializer.from_json(deck_json)
 
-        # Simulate mod timestamps: only n0 was modified after timestamp  
+        # Simulate mod timestamps: only n0 was modified after timestamp
         for i, note in enumerate(deck.notes):
             mock_obj = MockAnkiNote()
             mock_obj.mod = 100 + i * 10  # 100, 110, 120
@@ -425,8 +463,11 @@ class TestDeckInitializerHelpers:
 
     def test_remove_tags_from_notes(self):
         nt = make_notetype(name="Basic", model_uuid="m-001")
-        notes = [make_note_dict(guid="n1", note_model_uuid="m-001",
-                                tags=["keep", "remove_me"])]
+        notes = [
+            make_note_dict(
+                guid="n1", note_model_uuid="m-001", tags=["keep", "remove_me"]
+            )
+        ]
         deck_json = make_deck_json(name="Test", notes=notes, note_models=[nt])
         deck = deck_initializer.from_json(deck_json)
 
@@ -441,12 +482,12 @@ class TestDeckInitializerHelpers:
     def test_trim_empty_children(self):
         child_empty = make_deck_json(name="Empty")
         child_with_notes = make_deck_json(
-            name="HasNotes",
-            notes=[make_note_dict(guid="n1", note_model_uuid="m-001")])
+            name="HasNotes", notes=[make_note_dict(guid="n1", note_model_uuid="m-001")]
+        )
         nt = make_notetype(name="Basic", model_uuid="m-001")
-        root = make_deck_json(name="Root",
-                               children=[child_empty, child_with_notes],
-                               note_models=[nt])
+        root = make_deck_json(
+            name="Root", children=[child_empty, child_with_notes], note_models=[nt]
+        )
         deck = deck_initializer.from_json(root)
         deck_initializer.trim_empty_children(deck)
         assert len(deck.children) == 1

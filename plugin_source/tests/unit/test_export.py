@@ -8,6 +8,7 @@ These verify:
 - Personal tag retrieval (get_personal_tags)
 - Deck submission payload preparation
 """
+
 import os
 import re
 import copy
@@ -15,8 +16,11 @@ import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 
 from tests.conftest import (
-    make_notetype, make_note_dict, make_deck_json,
-    create_mock_collection, MockAnkiNote,
+    make_notetype,
+    make_note_dict,
+    make_deck_json,
+    create_mock_collection,
+    MockAnkiNote,
 )
 
 from export_manager import (
@@ -27,13 +31,14 @@ from export_manager import (
     ALL_COMPILED_MEDIA_REGEXES,
 )
 
-from utils import (    
+from utils import (
     get_personal_tags,
 )
 
 # ──────────────────────────────────────────────────────────────────────
 # Media regex pattern matching
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestSoundRegex:
     """Sound references: [sound:filename.mp3]"""
@@ -95,7 +100,7 @@ class TestHtmlMediaRegex:
         pytest.fail("No regex matched single-quoted img src")
 
     def test_img_unquoted_src(self):
-        text = '<img src=image_no_quotes.png>'
+        text = "<img src=image_no_quotes.png>"
         for regex in COMPILED_HTML_MEDIA_REGEXES:
             m = regex.search(text)
             if m and m.group("fname") == "image_no_quotes.png":
@@ -179,6 +184,7 @@ class TestMediaRegexReplacement:
 # Media file validation
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestIsValidMediaFile:
     def test_nonexistent_file(self):
         assert _is_valid_media_file("/no/such/file.png") is False
@@ -208,6 +214,7 @@ class TestIsValidMediaFile:
 # ──────────────────────────────────────────────────────────────────────
 # Filename mapping filter
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestFilterValidFilenameMapping:
     def test_empty_mapping(self):
@@ -240,6 +247,7 @@ class TestFilterValidFilenameMapping:
 # Personal tags for export
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestGetPersonalTags:
     def test_default_protected_tags_when_deck_not_found(self, mw_mock):
         """When deck hash is not in config, return defaults."""
@@ -264,7 +272,7 @@ class TestGetPersonalTags:
         assert "custom_tag_2" in tags
         assert "AnkiCollab_Protect" in tags
         assert "AnkiCollab_Personal" in tags
-        
+
     def test_deck_without_personal_tags_key_gets_defaults(self, mw_mock):
         """When a deck entry exists but no personal_tags key, defaults are set."""
         config = {"hash_abc": {"deckId": 1}}
@@ -279,4 +287,3 @@ class TestGetPersonalTags:
         assert "leech" in tags
         assert "AnkiCollab_Protect" in tags
         assert "AnkiCollab_Personal" in tags
-        

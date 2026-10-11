@@ -24,17 +24,14 @@ logger = get_logger("ankicollab.api_client")
 
 class ApiConnectionError(requests.exceptions.ConnectionError):
     """Raised when the client cannot connect to the AnkiCollab server."""
+
     pass
 
 
 class _ApiClient:
-    """Thin wrapper around ``requests`` that injects the bearer token."""
-
     def __init__(self):
         self._timeout_default = 30
         self._timeout_large = 120
-
-    # ── internal helpers ──────────────────────────────────────────────
 
     def _auth_headers(self, token: str) -> dict:
         """Return headers dict with the Authorization bearer token."""
@@ -43,12 +40,14 @@ class _ApiClient:
     def _get_token(self) -> str:
         """Lazily import ``auth_manager`` to avoid circular imports."""
         from .auth_manager import auth_manager
+
         return auth_manager.get_token()
 
     def _check_for_auth_failure(self, response: requests.Response) -> None:
         """If *response* is 401, clear local credentials and warn the user."""
         if response.status_code == 401:
             from .auth_manager import auth_manager
+
             auth_manager.handle_auth_failure()
 
     def _request(
@@ -57,18 +56,15 @@ class _ApiClient:
         url: str,
         **kwargs,
     ) -> requests.Response:
-        """Execute an HTTP request and handle connection errors gracefully.
-
-        On ``ConnectionError`` or ``Timeout`` an ``ApiConnectionError`` is
-        raised with a user-friendly message so the workflow can abort cleanly.
-        Callers further up the stack are responsible for showing a single
-        error dialog.
-        """
+        """Execute an HTTP request and handle connection errors gracefully."""
         try:
             response = requests.request(method, url, **kwargs)
             self._check_for_auth_failure(response)
             return response
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as exc:
             logger.warning(
                 "Network error during %s %s: %s",
                 method.upper(),
@@ -193,19 +189,8 @@ class _ApiClient:
             verify=True,
         )
 
-    def session_with_auth(self) -> requests.Session:
-        """Return a ``requests.Session`` pre-configured with bearer auth.
-
-        Useful for media_manager which makes multiple requests in a row.
-        Mounts a retry adapter to handle transient connection resets
-        (e.g. stale keep-alive connections being closed by the server).
-        """
-        token = self._get_token()
-        session = requests.Session()
-        if token:
-            session.headers.update(self._auth_headers(token))
-
-        # Retry on transport-level errors (connection resets, DNS failures, etc.)
+    def session_with_retries(self) -> requests.Session:
+        """Return a requests session configured for transient failures."""
         retry_strategy = Retry(
             total=3,
             backoff_factor=1,
@@ -213,10 +198,21 @@ class _ApiClient:
             allowed_methods=["GET", "POST", "PUT"],
             raise_on_status=False,
         )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
+        adapter = HTTPAdapter(max_retries=retry_strategy)  # type: ignore
+        session = requests.Session()
         session.mount("https://", adapter)
         session.mount("http://", adapter)
+        return session
 
+    def session_with_auth(self) -> requests.Session:
+        """Return a ``requests.Session`` pre-configured with bearer auth.
+
+        Useful for media_manager which makes multiple requests in a row.
+        """
+        token = self._get_token()
+        session = self.session_with_retries()
+        if token:
+            session.headers.update(self._auth_headers(token))
         return session
 
 

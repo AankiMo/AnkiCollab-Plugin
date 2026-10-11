@@ -34,10 +34,14 @@ class Ui_Dialog(object):
         self.import_message_label.setObjectName("import_message_label")
         self.verticalLayout_4.addWidget(self.import_message_label)
         self.import_message_textbox = QtWidgets.QTextBrowser(self.group_deck_import)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.import_message_textbox.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.import_message_textbox.sizePolicy().hasHeightForWidth()
+        )
         self.import_message_textbox.setSizePolicy(sizePolicy)
         self.import_message_textbox.setObjectName("import_message_textbox")
         self.verticalLayout_4.addWidget(self.import_message_textbox)
@@ -83,24 +87,48 @@ class Ui_Dialog(object):
         self.verticalLayout.addLayout(self.horizontalLayout)
         self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
         self.buttonBox.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Cancel|QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        self.buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            | QtWidgets.QDialogButtonBox.StandardButton.Ok
+        )
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
 
         self.retranslateUi(Dialog)
-        self.buttonBox.accepted.connect(Dialog.accept) # type: ignore
-        self.buttonBox.rejected.connect(Dialog.reject) # type: ignore
+        self.buttonBox.accepted.connect(Dialog.accept)  # type: ignore
+        self.buttonBox.rejected.connect(Dialog.reject)  # type: ignore
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "CrowdAnki Import Settings"))
-        self.import_message_label.setText(_translate("Dialog", "<html><head/><body><p><span style=\" font-weight:600;\">Import Message</span></p></body></html>"))
-        self.import_message_textbox.setPlaceholderText(_translate("Dialog", "Message from a deck manager about the recent import"))
+        self.import_message_label.setText(
+            _translate(
+                "Dialog",
+                '<html><head/><body><p><span style=" font-weight:600;">Import Message</span></p></body></html>',
+            )
+        )
+        self.import_message_textbox.setPlaceholderText(
+            _translate("Dialog", "Message from a deck manager about the recent import")
+        )
         self.cb_tag_cards.setText(_translate("Dialog", "Tag Cards"))
-        self.textedit_tags.setPlaceholderText(_translate("Dialog", "Tag1, RecentlyImported, Broken"))
-        self.cb_ignore_move_cards.setText(_translate("Dialog", "Do Not Move Existing Cards"))
-        self.label_2.setText(_translate("Dialog", "<html><head/><body><p><span style=\" font-weight:600;\">Deck Parts to Use</span></p></body></html>"))
+        self.textedit_tags.setPlaceholderText(
+            _translate("Dialog", "Tag1, RecentlyImported, Broken")
+        )
+        self.cb_ignore_move_cards.setText(
+            _translate("Dialog", "Do Not Move Existing Cards")
+        )
+        self.label_2.setText(
+            _translate(
+                "Dialog",
+                '<html><head/><body><p><span style=" font-weight:600;">Deck Parts to Use</span></p></body></html>',
+            )
+        )
         self.cb_notes.setText(_translate("Dialog", "Notes (Cards)"))
         self.cb_media.setText(_translate("Dialog", "Media"))
-        self.label.setText(_translate("Dialog", "<html><head/><body><p><span style=\" font-weight:600;\">Personal Fields</span> - <span style=\" font-style:italic;\">Fields which will keep their existing values instead of being imported</span></p></body></html>"))
+        self.label.setText(
+            _translate(
+                "Dialog",
+                '<html><head/><body><p><span style=" font-weight:600;">Personal Fields</span> - <span style=" font-style:italic;">Fields which will keep their existing values instead of being imported</span></p></body></html>',
+            )
+        )

@@ -24,6 +24,7 @@ from .media_exporter import DeckMediaExporter, MediaExporter, NoteMediaExporter
 
 AUDIO_EXTS = aqt.editor.audio
 
+
 def get_export_folder(parent: QWidget) -> str:
     "Get the export folder from the user."
     return QFileDialog.getExistingDirectory(

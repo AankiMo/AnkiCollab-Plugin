@@ -9,7 +9,7 @@ class JsonSerializable:
     export_filter_set = {
         "mod",  # Modification time
         "usn",  # Todo clarify
-        #"id"
+        # "id"
     }
     import_filter_set = {"__type__"}
 
@@ -22,8 +22,10 @@ class JsonSerializable:
         if isinstance(object_to_serialize, JsonSerializable):
             return object_to_serialize.flatten()
 
-        raise TypeError(f"Object of a type {JsonSerializable} expected. "
-                        f"Got {object_to_serialize} of a type {type(object_to_serialize)} instead")
+        raise TypeError(
+            f"Object of a type {JsonSerializable} expected. "
+            f"Got {object_to_serialize} of a type {type(object_to_serialize)} instead"
+        )
 
     @staticmethod
     def json_object_hook(json_dict):
@@ -54,13 +56,14 @@ class JsonSerializable:
         """
 
     def flatten(self):
-        return {self.readable_names[key] if key in self.readable_names else key: value
-                for key, value in self.serialization_dict().items() if
-                key not in self.export_filter_set}
+        return {
+            self.readable_names[key] if key in self.readable_names else key: value
+            for key, value in self.serialization_dict().items()
+            if key not in self.export_filter_set
+        }
 
     def serialization_dict(self):
-        return utils.merge_dicts(self.__dict__,
-                                 {"__type__": self.__class__.__name__})
+        return utils.merge_dicts(self.__dict__, {"__type__": self.__class__.__name__})
 
     def _update_fields(self):
         """
@@ -93,8 +96,9 @@ class JsonSerializableAnkiDict(JsonSerializable):
         self.anki_dict = anki_dict
 
     def serialization_dict(self):
-        return utils.merge_dicts(super(JsonSerializableAnkiDict, self).serialization_dict(),
-                                 self.anki_dict)
+        return utils.merge_dicts(
+            super(JsonSerializableAnkiDict, self).serialization_dict(), self.anki_dict
+        )
 
     def _update_fields(self):
         self.anki_dict.setdefault(UUID_FIELD_NAME, str(uuid1()))
@@ -117,7 +121,10 @@ class JsonSerializableAnkiDict(JsonSerializable):
 
 
 class JsonSerializableAnkiObject(JsonSerializable):
-    export_filter_set = JsonSerializable.export_filter_set | {"anki_object", "anki_object_dict"}
+    export_filter_set = JsonSerializable.export_filter_set | {
+        "anki_object",
+        "anki_object_dict",
+    }
 
     def __init__(self, anki_object=None):
         super(JsonSerializableAnkiObject, self).__init__()
@@ -125,8 +132,10 @@ class JsonSerializableAnkiObject(JsonSerializable):
         self.anki_object_dict = getattr(anki_object, "__dict__", None)
 
     def serialization_dict(self):
-        return utils.merge_dicts(super(JsonSerializableAnkiObject, self).serialization_dict(),
-                                 self.anki_object.__dict__)
+        return utils.merge_dicts(
+            super(JsonSerializableAnkiObject, self).serialization_dict(),
+            self.anki_object.__dict__,
+        )
 
     # def _update_fields(self):
     #     utils.add_absent_field(self.anki_object, UUID_FIELD_NAME, str(uuid1()))

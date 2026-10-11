@@ -3,4 +3,4 @@
 
 from .colors import get_colors, get_color
 
-__all__ = ['get_colors', 'get_color']
+__all__ = ["get_colors", "get_color"]

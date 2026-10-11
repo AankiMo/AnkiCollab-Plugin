@@ -1,0 +1,32 @@
+# Coverage configuration for the AnkiCollab addon test suite.
+#
+# Coverage is measured only over the addon's own source — vendored packages
+# (dist/), the fake-runtime fixtures (MagicMock/), the Qt-only webview, test
+# files, and Qt-heavy glue are excluded so the number reflects real logic.
+
+[run]
+branch = True
+source = .
+omit =
+    tests/*
+    dist/*
+    MagicMock/*
+    notifications_webview/*
+    conftest.py
+    main.py
+    dialogs.py
+    ui/*
+    crowd_anki/**/__init__.py
+    **/__init__.py
+    *.pyc
+    __pycache__/*
+
+[report]
+# Focus enforcement on real logic; do not let Qt-only UI drag the number.
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if __name__ == .__main__.:
+    raise AssertionError
+    # Qt rendering / layout paths that cannot run without a real Anki instance

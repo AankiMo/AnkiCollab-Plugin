@@ -5,8 +5,14 @@ path safety, optional tags, note ID lookups.
 import os
 import zipfile
 import pytest
+import import_manager
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+import base64
+import gzip
+import json
+
+from utils import OperationAbortedError
 
 from import_manager import (
     CacheBootstrapError,
@@ -19,17 +25,20 @@ from import_manager import (
     check_optional_tag_changes,
     update_timestamp,
     update_deck_stats_enabled,
-    get_noteids_from_uuids,
-    get_guids_from_noteids,
     delete_notes,
     wants_to_share_stats,
-    do_nothing,
+    CacheBootstrapError,
+    CacheArchiveRefreshError,
+    async_start_pull,
+    _install_deck_op,
+    _on_deck_installed,
 )
-
+from crowd_anki.representation.deck import Deck
 
 # ──────────────────────────────────────────────────────────────────────
 # CacheBootstrapError
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestCacheBootstrapError:
     def test_is_runtime_error(self):
@@ -39,6 +48,7 @@ class TestCacheBootstrapError:
 # ──────────────────────────────────────────────────────────────────────
 # _fetch_manifest
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestFetchManifest:
     @patch("import_manager.requests.get")
@@ -55,6 +65,7 @@ class TestFetchManifest:
     @patch("import_manager.requests.get")
     def test_network_error(self, mock_get):
         import requests
+
         mock_get.side_effect = requests.RequestException("timeout")
         with pytest.raises(CacheBootstrapError, match="Unable to download"):
             _fetch_manifest("http://example.com/manifest.json")
@@ -73,6 +84,7 @@ class TestFetchManifest:
 # ──────────────────────────────────────────────────────────────────────
 # _safe_destination
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestSafeDestination:
     def test_normal_path(self, tmp_path):
@@ -96,6 +108,7 @@ class TestSafeDestination:
 # ──────────────────────────────────────────────────────────────────────
 # _coerce_subscription_payload
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestCoerceSubscriptionPayload:
     def test_dict_with_deck_key(self):
@@ -130,6 +143,7 @@ class TestCoerceSubscriptionPayload:
 # ──────────────────────────────────────────────────────────────────────
 # _extract_media_entries
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestExtractMediaEntries:
     def test_extracts_files(self, tmp_path, mw_mock):
@@ -197,6 +211,7 @@ class TestExtractMediaEntries:
 # Optional tags
 # ──────────────────────────────────────────────────────────────────────
 
+
 class TestOptionalTags:
     @pytest.fixture(autouse=True)
     def _deck_config(self, mw_mock):
@@ -225,36 +240,9 @@ class TestOptionalTags:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Note ID / GUID lookups
-# ──────────────────────────────────────────────────────────────────────
-
-class TestNoteIdLookups:
-    def test_get_noteids_empty_input(self, mw_mock):
-        assert get_noteids_from_uuids([]) == []
-
-    def test_get_noteids_no_collection(self, mw_no_col):
-        assert get_noteids_from_uuids(["guid1"]) == []
-
-    def test_get_noteids_batch(self, mw_mock):
-        mw_mock.col.db.list.return_value = [100, 101]
-        result = get_noteids_from_uuids(["g1", "g2"])
-        assert result == [100, 101]
-
-    def test_get_guids_empty_input(self, mw_mock):
-        assert get_guids_from_noteids([]) == []
-
-    def test_get_guids_no_collection(self, mw_no_col):
-        assert get_guids_from_noteids([1, 2]) == []
-
-    def test_get_guids_batch(self, mw_mock):
-        mw_mock.col.db.list.return_value = ["g1", "g2"]
-        result = get_guids_from_noteids([100, 101])
-        assert result == ["g1", "g2"]
-
-
-# ──────────────────────────────────────────────────────────────────────
 # wants_to_share_stats
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TestWantsToShareStats:
     def test_unknown_deck_returns_false(self, mw_mock):
@@ -279,10 +267,309 @@ class TestWantsToShareStats:
         assert ts == 12345
 
 
+class TestCollectionMutatingImportOperations:
+    def test_install_deck_op_saves_metadata_then_bulk_notes(self, mw_mock):
+        col = mw_mock.col
+        deck = MagicMock(spec=Deck)
+        deck.calculate_total_work.return_value = 12
+        deck.create_unified_progress_tracker.return_value = "progress"
+        deck.save_decks_and_notes_bulk.return_value = (12, {"success": True})
+        config = MagicMock(home_deck="Home")
+
+        with (
+            patch(
+                "import_manager.check_collection_or_abort", return_value=col
+            ) as check,
+            patch("import_manager.deck_initializer"),
+        ):
+            result = _install_deck_op(deck, config)
+
+        assert result == (12, {"success": True})
+        deck.save_metadata.assert_called_once_with(col, "Home")
+        deck.calculate_total_work.assert_called_once_with()
+        deck.create_unified_progress_tracker.assert_called_once_with(12)
+        deck.save_decks_and_notes_bulk.assert_called_once_with(
+            collection=col, progress_tracker="progress", import_config=config
+        )
+        assert check.call_count == 2
+        assert [call.args[0] for call in check.call_args_list] == [
+            "deck_installation_start",
+            "after_metadata_save",
+        ]
+
+    def test_on_deck_installed_registers_new_subscription_and_updates_timestamp(
+        self, mw_mock
+    ):
+        deck = MagicMock()
+        deck.anki_dict = {"name": "Imported"}
+        subscription = {
+            "deck_hash": "hash1",
+            "stats_enabled": False,
+            "deleted_notes": [],
+            "deck_last_modified": "2026-09-24T12:34:56Z",
+        }
+        config = {
+            "hash1": {"deckId": 0},
+        }
+        mw_mock.addonManager.getConfig = MagicMock(return_value=config)
+        mw_mock.addonManager.writeConfig = MagicMock()
+        mw_mock.col.decks.id.return_value = 44
+
+        manager = MagicMock()
+        manager.__enter__.return_value = manager
+        manager.__iter__.return_value = iter([])
+        manager.get_by_hash.return_value = config["hash1"]
+
+        with (
+            patch("import_manager.is_collection_available", return_value=True),
+            patch("import_manager.DeckManager", return_value=manager),
+            patch("import_manager.update_timestamp") as update_timestamp,
+            patch("import_manager.ask_for_rating"),
+            patch("import_manager._handle_stats_sharing_after_import"),
+        ):
+            result = _on_deck_installed(
+                (1, {"success": True}),
+                deck,
+                subscription,
+                input_hash="hash1",
+                update_timestamp_after=True,
+            )
+
+        assert result == "Imported"
+        assert config["hash1"]["deckId"] == 44
+        assert config["hash1"]["stats_enabled"] is False
+        assert "timestamp" in config["hash1"]
+        update_timestamp.assert_called_once_with("hash1")
+        mw_mock.reset.assert_called_once()
+
+    def test_delete_notes_removes_notes_resets_collection_and_notifies(self, mw_mock):
+        mw_mock.col.reset = MagicMock()
+        with patch("import_manager.QApplication.focusWidget", return_value=None):
+            import_manager.delete_notes([10, 11])
+
+        mw_mock.col.remove_notes.assert_called_once_with([10, 11])
+        mw_mock.col.reset.assert_called_once()
+        mw_mock.reset.assert_called_once()
+        mw_mock.taskman.run_on_main.assert_called_once()
+
+
 # ──────────────────────────────────────────────────────────────────────
-# do_nothing
+# _extract_media_entries — new hardening (symlinks, macOS junk, dirs)
 # ──────────────────────────────────────────────────────────────────────
 
-class TestDoNothing:
-    def test_returns_none(self):
-        assert do_nothing(42) is None
+
+class TestExtractMediaEntriesHardening:
+    def test_rejects_symlink_entries(self, tmp_path, mw_mock):
+        """Archives must not be able to plant symlinks in the media folder."""
+        media_dir = tmp_path / "media"
+        media_dir.mkdir()
+        mw_mock.col.media.dir.return_value = str(media_dir)
+
+        zip_path = tmp_path / "test.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zi = zipfile.ZipInfo("evil_link")
+            zi.create_system = 3  # Unix
+            zi.external_attr = 0o120777 << 16  # S_IFLNK | 0777
+            zf.writestr(zi, "/etc/passwd")
+
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            with pytest.raises(CacheBootstrapError, match="Symlink"):
+                _extract_media_entries(zf, {"path_prefix": ""})
+
+    def test_skips_macosx_entries_when_no_prefix(self, tmp_path, mw_mock):
+        media_dir = tmp_path / "media"
+        media_dir.mkdir()
+        mw_mock.col.media.dir.return_value = str(media_dir)
+
+        zip_path = tmp_path / "test.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("__MACOSX/._foo", b"macosx metadata")
+            zf.writestr("foo.png", b"\x89PNG" + b"\x00" * 100)
+
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            count = _extract_media_entries(zf, {"path_prefix": ""})
+
+        assert count == 1
+        assert (media_dir / "foo.png").exists()
+        assert not (media_dir / "._foo").exists()
+
+    def test_skips_directory_entries(self, tmp_path, mw_mock):
+        media_dir = tmp_path / "media"
+        media_dir.mkdir()
+        mw_mock.col.media.dir.return_value = str(media_dir)
+
+        zip_path = tmp_path / "test.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr(zipfile.ZipInfo("subdir/"), "")
+            zf.writestr("subdir/img.png", b"\x89PNG" + b"\x00" * 100)
+
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            count = _extract_media_entries(zf, {"path_prefix": ""})
+
+        assert count == 1
+        assert (media_dir / "subdir" / "img.png").exists()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# async_start_pull — cache archive refresh / abort / error handling
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _encode_pull_response(payload: dict) -> bytes:
+    """Mirror the server's base64(gzip(json)) encoding."""
+    return base64.b64encode(gzip.compress(json.dumps(payload).encode("utf-8")))
+
+
+def _fake_pull_response(payload: dict, status_code: int = 200):
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.content = _encode_pull_response(payload)
+    return resp
+
+
+class TestAsyncStartPullCacheRefresh:
+    def test_expired_archive_url_triggers_refresh(self, mw_mock):
+        """CacheArchiveRefreshError should cause a second /pullChanges call."""
+        config = {"h1": {"deckId": 0, "timestamp": "2025-01-01 00:00:00"}}
+        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(config)
+
+        fake_resp = _fake_pull_response({"h1": "payload"})
+
+        with (
+            patch("import_manager.remove_nonexistent_decks"),
+            patch(
+                "import_manager.api_client.post_json", return_value=fake_resp
+            ) as mock_post,
+            patch(
+                "import_manager._resolve_cache_bootstrap_entries",
+                side_effect=[
+                    CacheArchiveRefreshError("expired"),
+                    [{"deck": {"name": "Refreshed"}}],
+                ],
+            ),
+        ):
+            result = async_start_pull(None)
+
+        assert result == ([{"deck": {"name": "Refreshed"}}], None, False)
+        assert mock_post.call_count == 2  # initial + refresh
+
+    def test_refresh_failure_surfaces_error(self, mw_mock):
+        """If the refreshed URL also fails, we must abort with a user error."""
+        config = {"h1": {"deckId": 0}}
+        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(config)
+
+        fake_resp = _fake_pull_response({"h1": "payload"})
+
+        with (
+            patch("import_manager.remove_nonexistent_decks"),
+            patch("import_manager.api_client.post_json", return_value=fake_resp),
+            patch(
+                "import_manager._resolve_cache_bootstrap_entries",
+                side_effect=[
+                    CacheArchiveRefreshError("expired"),
+                    CacheBootstrapError("still broken"),
+                ],
+            ),
+            patch("import_manager._notify_cache_bootstrap_failure") as mock_notify,
+        ):
+            result = async_start_pull(None)
+
+        assert result == (None, None, False)
+        mock_notify.assert_called_once()
+
+    def test_cache_bootstrap_error_surfaces_error(self, mw_mock):
+        """A plain CacheBootstrapError shows the user-facing error, no refresh."""
+        config = {"h1": {"deckId": 0}}
+        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(config)
+
+        fake_resp = _fake_pull_response({"h1": "payload"})
+
+        with (
+            patch("import_manager.remove_nonexistent_decks"),
+            patch(
+                "import_manager.api_client.post_json", return_value=fake_resp
+            ) as mock_post,
+            patch(
+                "import_manager._resolve_cache_bootstrap_entries",
+                side_effect=CacheBootstrapError("bad manifest"),
+            ),
+            patch("import_manager._notify_cache_bootstrap_failure") as mock_notify,
+        ):
+            result = async_start_pull(None)
+
+        assert result == (None, None, False)
+        mock_notify.assert_called_once()
+        assert mock_post.call_count == 1  # no refresh attempted
+
+    def test_abort_removes_pending_subscription(self, mw_mock):
+        """OperationAbortedError with an input_hash must clean up the config."""
+        config = {"h1": {"deckId": 0, "timestamp": "2025-01-01 00:00:00"}}
+        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(config)
+
+        fake_resp = _fake_pull_response({"h1": "payload"})
+
+        with (
+            patch("import_manager.remove_nonexistent_decks"),
+            patch("import_manager.api_client.post_json", return_value=fake_resp),
+            patch(
+                "import_manager._resolve_cache_bootstrap_entries",
+                side_effect=OperationAbortedError("cancelled"),
+            ),
+            patch("import_manager._remove_subscription_from_config") as mock_remove,
+        ):
+            result = async_start_pull("h1")
+
+        assert result == (None, None, True)
+        mock_remove.assert_called_once_with("h1")
+
+    def test_abort_without_input_hash_keeps_config(self, mw_mock):
+        """An update (no input_hash) must not purge the subscription."""
+        config = {"h1": {"deckId": 1, "timestamp": "2025-01-01 00:00:00"}}
+        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(config)
+
+        fake_resp = _fake_pull_response({"h1": "payload"})
+
+        with (
+            patch("import_manager.remove_nonexistent_decks"),
+            patch("import_manager.api_client.post_json", return_value=fake_resp),
+            patch(
+                "import_manager._resolve_cache_bootstrap_entries",
+                side_effect=OperationAbortedError("cancelled"),
+            ),
+            patch("import_manager._remove_subscription_from_config") as mock_remove,
+        ):
+            result = async_start_pull(None)
+
+        assert result == (None, None, True)
+        mock_remove.assert_not_called()
+
+    def test_server_error_response_returns_none(self, mw_mock):
+        """Non-200/401 responses must return the sentinel tuple, not crash."""
+        config = {"h1": {"deckId": 0}}
+        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(config)
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 500
+
+        with (
+            patch("import_manager.remove_nonexistent_decks"),
+            patch("import_manager.api_client.post_json", return_value=fake_resp),
+        ):
+            result = async_start_pull(None)
+
+        assert result == (None, None, False)
+
+    def test_unauthorized_response_returns_none(self, mw_mock):
+        config = {"h1": {"deckId": 0}}
+        mw_mock.addonManager.getConfig.side_effect = lambda *a, **kw: dict(config)
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 401
+
+        with (
+            patch("import_manager.remove_nonexistent_decks"),
+            patch("import_manager.api_client.post_json", return_value=fake_resp),
+        ):
+            result = async_start_pull(None)
+
+        assert result == (None, None, False)

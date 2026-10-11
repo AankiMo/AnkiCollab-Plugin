@@ -39,6 +39,7 @@ logger = get_logger("ankicollab.notifications")
 
 
 if QWebEnginePage is not None:
+
     class _NotificationPage(QWebEnginePage):
         def __init__(self, dialog: "NotificationCenterDialog", parent=None) -> None:
             super().__init__(parent)
@@ -52,6 +53,7 @@ if QWebEnginePage is not None:
                 self._dialog._handle_open_guid(url)
                 return False
             return super().acceptNavigationRequest(url, nav_type, is_main_frame)
+
 else:
     _NotificationPage = None
 
@@ -88,7 +90,12 @@ class _CenterFetchThread(QThread):
             unread_payload: Dict[str, Any] = dict(self._unread_cache)
         else:
             unread_payload: Dict[str, Any] = {"unread_count": 0, "groups": []}
-        history_payload: Dict[str, Any] = {"total": 0, "offset": 0, "limit": 200, "items": []}
+        history_payload: Dict[str, Any] = {
+            "total": 0,
+            "offset": 0,
+            "limit": 200,
+            "items": [],
+        }
         commit_snapshots: Dict[str, Any] = {}
 
         try:
@@ -99,7 +106,9 @@ class _CenterFetchThread(QThread):
             logger.warning("Failed to fetch unread notifications for center: %s", err)
 
         try:
-            history_response = api_client.get("/GetNotificationsHistory?offset=0&limit=200", auth=True, timeout=12)
+            history_response = api_client.get(
+                "/GetNotificationsHistory?offset=0&limit=200", auth=True, timeout=12
+            )
             if history_response.status_code == 200:
                 history_payload = history_response.json()
         except Exception as err:
@@ -141,7 +150,11 @@ class NotificationCenterManager:
         self._fetch_thread: Optional[_UnreadFetchThread] = None
         self._center_fetch_thread: Optional[_CenterFetchThread] = None
         self._center_dialog: Optional[NotificationCenterDialog] = None
-        self._unread_payload: Dict[str, Any] = {"ok": False, "unread_count": 0, "groups": []}
+        self._unread_payload: Dict[str, Any] = {
+            "ok": False,
+            "unread_count": 0,
+            "groups": [],
+        }
         self._menu_attached = False
         self._poll_timer: Optional[QTimer] = None
 
@@ -208,8 +221,17 @@ class NotificationCenterManager:
             self._center_dialog.activateWindow()
             return
 
-        unread_payload = self._unread_payload if self._unread_payload.get("ok") else {"unread_count": 0, "groups": []}
-        history_payload: Dict[str, Any] = {"total": 0, "offset": 0, "limit": 200, "items": []}
+        unread_payload = (
+            self._unread_payload
+            if self._unread_payload.get("ok")
+            else {"unread_count": 0, "groups": []}
+        )
+        history_payload: Dict[str, Any] = {
+            "total": 0,
+            "offset": 0,
+            "limit": 200,
+            "items": [],
+        }
 
         self._center_dialog = NotificationCenterDialog(
             unread_payload,
@@ -230,7 +252,11 @@ class NotificationCenterManager:
         self.schedule_refresh()
 
     def _mark_as_read(self, payload: Dict[str, Any]) -> None:
-        unread_payload = payload.get("unread", {"groups": []}) if isinstance(payload, dict) else {"groups": []}
+        unread_payload = (
+            payload.get("unread", {"groups": []})
+            if isinstance(payload, dict)
+            else {"groups": []}
+        )
 
         all_ids: List[int] = []
         for group in unread_payload.get("groups", []):
@@ -241,7 +267,9 @@ class NotificationCenterManager:
 
         if all_ids:
             try:
-                api_client.post_json("/MarkNotificationsRead", {"ids": all_ids}, timeout=10, auth=True)
+                api_client.post_json(
+                    "/MarkNotificationsRead", {"ids": all_ids}, timeout=10, auth=True
+                )
             except Exception as err:
                 logger.warning("Failed to mark notifications as read: %s", err)
 
@@ -250,7 +278,10 @@ class NotificationCenterManager:
             self._center_dialog.update_payload(payload, loading=False)
 
     def _refresh_center_payload(self) -> None:
-        if self._center_fetch_thread is not None and self._center_fetch_thread.isRunning():
+        if (
+            self._center_fetch_thread is not None
+            and self._center_fetch_thread.isRunning()
+        ):
             return
         if self._center_dialog is not None:
             self._center_dialog.set_loading(True)
@@ -259,16 +290,17 @@ class NotificationCenterManager:
         self._center_fetch_thread.fetched.connect(self._on_center_payload)
         self._center_fetch_thread.start()
 
+
 class NotificationCenterDialog(QDialog):
-  def __init__(
-    self,
-    unread_payload: Dict[str, Any],
-    history_payload: Dict[str, Any],
-    commit_snapshots: Dict[str, Any],
-    parent: Optional[QWidget] = None,
-    loading: bool = False,
-    on_refresh: Optional[Any] = None,
-  ) -> None:
+    def __init__(
+        self,
+        unread_payload: Dict[str, Any],
+        history_payload: Dict[str, Any],
+        commit_snapshots: Dict[str, Any],
+        parent: Optional[QWidget] = None,
+        loading: bool = False,
+        on_refresh: Optional[Any] = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("AnkiCollab Notifications")
         self.resize(880, 640)
@@ -278,11 +310,14 @@ class NotificationCenterDialog(QDialog):
 
         # Window-level shortcuts so Escape / Cmd+W (Ctrl+W) close the dialog
         # even when the embedded QWebEngineView has keyboard focus.
-        for key_seq in (QKeySequence(Qt.Key.Key_Escape), QKeySequence.StandardKey.Close):
+        for key_seq in (
+            QKeySequence(Qt.Key.Key_Escape),
+            QKeySequence.StandardKey.Close,
+        ):
             shortcut = QShortcut(key_seq, self)
             shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
             shortcut.activated.connect(self.close)
-            
+
         self._payload = {
             "unread": unread_payload,
             "history": history_payload,
@@ -315,6 +350,7 @@ class NotificationCenterDialog(QDialog):
         )
 
         if os.path.exists(index_path):
+
             def on_load_finished(ok: bool) -> None:
                 if not ok:
                     return
@@ -330,7 +366,7 @@ class NotificationCenterDialog(QDialog):
             fallback.setPlainText("Notification webview assets are missing.")
             layout.addWidget(fallback)
 
-  def _render_payload(self) -> None:
+    def _render_payload(self) -> None:
         if self._web is None or not self._web_loaded:
             return
         # json.dumps does not escape U+2028 (LINE SEPARATOR) or U+2029
@@ -351,10 +387,12 @@ class NotificationCenterDialog(QDialog):
         if page is not None:
             page.runJavaScript(script)
 
-  def update_payload(self, payload: Dict[str, Any], loading: bool = False) -> None:
+    def update_payload(self, payload: Dict[str, Any], loading: bool = False) -> None:
         self._payload = {
             "unread": payload.get("unread", {"unread_count": 0, "groups": []}),
-            "history": payload.get("history", {"total": 0, "offset": 0, "limit": 200, "items": []}),
+            "history": payload.get(
+                "history", {"total": 0, "offset": 0, "limit": 200, "items": []}
+            ),
             "commit_snapshots": payload.get("commit_snapshots", {}),
             "media_dir": mw.col.media.dir() if getattr(mw, "col", None) else "",
             "loading": loading,
@@ -362,46 +400,46 @@ class NotificationCenterDialog(QDialog):
         }
         self._render_payload()
 
-  def last_payload(self) -> Dict[str, Any]:
+    def last_payload(self) -> Dict[str, Any]:
         return self._payload
 
-  def set_loading(self, loading: bool) -> None:
-      self._payload["loading"] = loading
-      self._render_payload()
+    def set_loading(self, loading: bool) -> None:
+        self._payload["loading"] = loading
+        self._render_payload()
 
-  def _handle_refresh(self) -> None:
-      if callable(self._on_refresh):
-        self._on_refresh()
+    def _handle_refresh(self) -> None:
+        if callable(self._on_refresh):
+            self._on_refresh()
 
-  def _handle_open_guid(self, url: QUrl) -> None:
-      if not getattr(mw, "col", None) or not getattr(mw.col, "db", None):
-          return
+    def _handle_open_guid(self, url: QUrl) -> None:
+        if not getattr(mw, "col", None) or not getattr(mw.col, "db", None):
+            return
 
-      query_guid = parse_qs(url.query() or "").get("guid", [""])[0]
-      guid = unquote(query_guid).strip()
-      if not guid:
-          return
+        query_guid = parse_qs(url.query() or "").get("guid", [""])[0]
+        guid = unquote(query_guid).strip()
+        if not guid:
+            return
 
-      try:
-          nid = mw.col.db.scalar("SELECT id FROM notes WHERE guid = ?", guid)
-      except Exception as err:
-          logger.warning("Failed to resolve note GUID %s: %s", guid, err)
-          return
+        try:
+            nid = mw.col.db.scalar("SELECT id FROM notes WHERE guid = ?", guid)
+        except Exception as err:
+            logger.warning("Failed to resolve note GUID %s: %s", guid, err)
+            return
 
-      if not nid:
-          return
+        if not nid:
+            return
 
-      self.accept()
+        self.accept()
 
-      def _open_browser() -> None:
-          browser = aqt.dialogs.open("Browser", aqt.mw)
-          browser.form.searchEdit.lineEdit().setText(f"nid:{nid}")
-          browser.onSearchActivated()
+        def _open_browser() -> None:
+            browser = aqt.dialogs.open("Browser", aqt.mw)
+            browser.form.searchEdit.lineEdit().setText(f"nid:{nid}")
+            browser.onSearchActivated()
 
-      if hasattr(mw, "taskman") and hasattr(mw.taskman, "run_on_main"):
-          mw.taskman.run_on_main(_open_browser)
-      else:
-          QTimer.singleShot(0, _open_browser)
+        if hasattr(mw, "taskman") and hasattr(mw.taskman, "run_on_main"):
+            mw.taskman.run_on_main(_open_browser)
+        else:
+            QTimer.singleShot(0, _open_browser)
 
 
 notification_center = NotificationCenterManager()

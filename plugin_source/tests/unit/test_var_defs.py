@@ -21,7 +21,9 @@ class TestConstants:
     def test_version_format(self):
         # Version should be a dotted date string like "2026.01.15.1"
         parts = VERSION.split(".")
-        assert len(parts) >= 3, f"VERSION should have at least 3 dot-separated parts: {VERSION}"
+        assert (
+            len(parts) >= 3
+        ), f"VERSION should have at least 3 dot-separated parts: {VERSION}"
 
     def test_default_protected_tags_is_list(self):
         assert isinstance(DEFAULT_PROTECTED_TAGS, list)
@@ -36,7 +38,7 @@ class TestConstants:
 
     def test_prefix_protected_fields(self):
         assert PREFIX_PROTECTED_FIELDS == "AnkiCollab_Protect"
-    
+
     def test_prefix_protected_tags(self):
         assert PREFIX_PROTECTED_TAGS == "AnkiCollab_Personal"
 

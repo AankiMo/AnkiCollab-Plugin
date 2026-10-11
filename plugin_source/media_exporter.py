@@ -16,7 +16,7 @@ from typing import Generator
 from anki.collection import Collection, SearchNode
 from anki.decks import DeckId
 from anki.notes import Note
-from anki.models import NotetypeDict, TemplateDict 
+from anki.models import NotetypeDict, TemplateDict
 
 
 def gather_media_from_css(css: str) -> List[str]:
@@ -47,6 +47,7 @@ def gather_media_from_css(css: str) -> List[str]:
 
     return media_files
 
+
 def gather_media_from_template_side(template_side: str) -> List[str]:
     # Regular expression taken from the anki repo https://github.com/ankitects/anki/blob/c2b1ab5eb06935e93aea6af09a224a99f4b971f0/rslib/src/text.rs#L169
     underscored_references_pattern = re.compile(r"""(?x)
@@ -71,14 +72,16 @@ def gather_media_from_template_side(template_side: str) -> List[str]:
 
     return media_files
 
+
 def gather_media_from_template(template: TemplateDict) -> List[str]:
-    question_template = template['qfmt']
-    answer_template = template['afmt']
+    question_template = template["qfmt"]
+    answer_template = template["afmt"]
 
     media_files = gather_media_from_template_side(question_template)
     media_files.extend(gather_media_from_template_side(answer_template))
 
     return media_files
+
 
 def get_note_media(col: Collection, note: Note, field: Optional[str]) -> List[str]:
     "Return a list of used media files in `note`."
@@ -88,11 +91,12 @@ def get_note_media(col: Collection, note: Note, field: Optional[str]) -> List[st
         flds = "".join(note.fields)
     return col.media.files_in_str(note.mid, flds)
 
+
 def get_notetype_media(notetype: NotetypeDict) -> List[str]:
-    css_media = gather_media_from_css(notetype['css'])
+    css_media = gather_media_from_css(notetype["css"])
 
     template_media = []
-    for template in notetype['tmpls']:
+    for template in notetype["tmpls"]:
         template_media.extend(gather_media_from_template(template))
 
     return css_media + template_media
@@ -138,7 +142,7 @@ class MediaExporter(ABC):
                 shutil.copyfile(src_path, dest_path)
                 exported.add(filename)
             yield len(exported), filenames
-            
+
     def get_list_of_media(self):
         """
         Return a list of media files used by the deck.
@@ -150,7 +154,6 @@ class MediaExporter(ABC):
                     continue
                 seen.add(filename)
         return seen
-        
 
 
 class NoteMediaExporter(MediaExporter):
@@ -173,16 +176,17 @@ class NoteMediaExporter(MediaExporter):
 
         notetypes_in_selection = set()
         for note in self.notes:
-            notetypes_in_selection.add(note.note_type()['name'])
+            notetypes_in_selection.add(note.note_type()["name"])
             yield get_note_media(self.col, note, self.field)
 
         get_notetype_by_name = getattr(self.col.models, "by_name", None)
         if not get_notetype_by_name:
             get_notetype_by_name = self.col.models.byName  # type: ignore[attr-defined]
-            
+
         for notetype_name in notetypes_in_selection:
             notetype = get_notetype_by_name(notetype_name)
             yield get_notetype_media(notetype)
+
 
 class DeckMediaExporter(MediaExporter):
     "Exporter for all media in a deck."
@@ -205,17 +209,17 @@ class DeckMediaExporter(MediaExporter):
         if self.field:
             search_params.append(SearchNode(field_name=self.field))
         search = self.col.build_search_string(*search_params)
-        
+
         notetypes_in_deck = set()
         for nid in self.col.find_notes(search):
             note = self.col.get_note(nid)
-            notetypes_in_deck.add(note.note_type()['name'])
+            notetypes_in_deck.add(note.note_type()["name"])
             yield get_note_media(self.col, note, self.field)
 
         get_notetype_by_name = getattr(self.col.models, "by_name", None)
         if not get_notetype_by_name:
             get_notetype_by_name = self.col.models.byName  # type: ignore[attr-defined]
-            
+
         for notetype_name in notetypes_in_deck:
             notetype = get_notetype_by_name(notetype_name)
             yield get_notetype_media(notetype)
